@@ -105,3 +105,37 @@ No deadline extension, additional agents, optimizer, guest selectors/registers/
 RAM patches, forced empty pump, suppressed paints or swallowed errors.
 Independent owned PID/Chrome/socket/hash retrieval precedes prefix deletion.
 Final accounting and remaining trap details are retained with the run results.
+
+## Reviewer correction: unsigned AddRef count
+
+Root review correctly identified that reusing the GCO continuation must not
+interpret AddRef's ULONG count as an HRESULT. A registered-only F+4 mode tag
+now ignores that count before the shared continuation's HRESULT checks; the
+following real CreateInstance result and Release balance remain intact.
+The real owner regression returns80000001 from AddRef: it fails before this
+correction and passes afterward through creation, yield and failure cases.
+Storage registry and paint pump regressions also pass, as does the full
+canonical build. Fresh module is
+`d8d4096f957ed51cecab589b5a1ec7bf402336f13959ce0710faf2f7d3c68960`.
+This is a build/test correction after the browser runs: original browser
+evidence remains exactlyff3281, and no new browser was launched.
+
+Separate `scratch/runs/20261008T1236Z-tiberian-addref-count` retains failing/
+passing tests, source archive/patch, full canonical log,127 matching remote
+source/tool hashes and retrieved module. Initial canonical attempt lacked
+CLAUDE.md in the standalone build tree; the existing immutable root-files
+archive supplied the dependency, and the retry kept its original deadline.
+Root authorized one fresh no-env build-only box after57v6 cleanup/expiry:
+`bx_sq2kkxku`, root lifecycle, expiry12:52:40.771Z. Both native build PIDs
+are independently absent; no Chrome/crashpad or changed socket; prefix was
+removed12:43:33.404 only after hash retrieval. Build completion was first
+observed12:42:46.687 (exact process-exit timestamp unavailable); collection
+and removal finished46.717s afterward. Root owns remaining box lifecycle.
+
+Eight original browser walls total997.545s<1800, all below fixed300s limits.
+25 reviewed images;10 sealed phase bundles contain8324 indexed artifacts.
+The final independent hash check also includes three accepted earlier runs:
+9914 hashes match, zero containment errors and zero missing own artifacts;
+82 historical missing references remain outside this work. Shared HEAD/index/
+config and accepted evidence are untouched. Source/docs branches are clean
+after explicit commits; root integrates the listed source/test/doc paths.

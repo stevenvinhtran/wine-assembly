@@ -701,7 +701,8 @@ Independent00:36:37 verifies driver24552/Chrome24564 absent, noChrome and exact
 baseline sockets, all355runtime pins and12durable diagnostic copies unchanged.
 Only the owned runtime prefix was removed after copies. Remote slot released
 00:36:51; parent owns retained box lifecycle and queued Antara priority.
-# 2026-10-08: parent paint producer and registered activation ownership
+
+## 2026-10-08: parent paint producer and registered activation ownership
 
 Two generic repairs on explicita8e149a87, isolated branch
 `fix/tiberian-menu-pump-owner-20261008`:3f61a2e39 (exclusive primary paint
@@ -744,6 +745,16 @@ decode_run,run. Bounded code/stack bytes show heap/frame data at the execution
 target. The first bad control-flow transfer is still unowned; no instruction
 patch or guessed API repair. Campaign mission/unit commands remain unverified.
 Startup80040154 and historical consoleEIP0 are not this campaign fault.
+
+Reviewer correction after the browser run: registered AddRef returns ULONG,
+so high-bit counts must be ignored before the reused GCO HRESULT checks.
+A registered-only frame tag normalizes that return; real owner regression
+returning80000001 fails before and passes after with creation/Release balance
+and yields preserved. Full canonical build passes, new moduled8d4096f957ed51cecab589b5a1ec7bf402336f13959ce0710faf2f7d3c68960.
+Build-only1236 package is separate; no browser rerun. Actual original loading/
+trap screenshots and Worker source remainff3281. Root owns fresh no-env
+build boxsq2kkxku expiry12:52:40.771; all owned jobs/prefix already removed
+after source/module hash collection, no Chrome or changed socket.
 
 Runs1138/1140/1145/1154/1200/1212/1216/1222/1227 (full20261008T IDs in
 handoff) retain original-source/module/478pin identity, ordinary input,
