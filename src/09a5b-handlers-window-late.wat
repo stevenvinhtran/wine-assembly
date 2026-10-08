@@ -365,7 +365,7 @@
       (then
         ;; Remove CallWindowProc's extra lpPrevWndFunc argument, retaining
         ;; the subclass return address and the four dialog arguments. Use the
-        ;; same default handling and modal-capable tail dispatch as DefDlgProc;
+        ;; same default handling and modal-capable continuation as DefDlgProc;
         ;; a bounded recursive send abandons an open nested dialog's stack.
         (call $gs32
           (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4))
