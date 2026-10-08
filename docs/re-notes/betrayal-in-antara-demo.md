@@ -1,5 +1,13 @@
 # Betrayal in Antara (demo) -- PARKED
 
+Install continuation2026-10-08: precise private collector now selects original
+3:dad6 USER46/59/42/124 return candidates only during reserved DOWN/input
+context. Offline authentication requires originalseg3 caller and savedseg4:248d
+plus critical248b selector targeting the actual owningseg3. Wrong caller API
+flood produces zero owner reads; code/selector negatives pass. New0140 Worker3fa2
+is prepared, not executed; old0122 hover proof and prepared0133 Worker9beb remain
+separate. See [Install action handoff](../../ops/handoffs/antara-install-action-20261008.md).
+
 Actual hover/action observation2026-10-08: live005f/base1a0000 USER125 return
 4:2427 authenticates against originalsegment4. Frame-derived object008f:655a
 has+1c6=011c, savedpoint408,144 and selection+1e6=1; ordinary hover turns
