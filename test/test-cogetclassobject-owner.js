@@ -52,7 +52,7 @@ sharedCom.classes.set('{12345678-0000-0000-0000-000000000000}',{pUnkGA:factory})
 // shadow has ESP=0; running its callback cannot construct this stdcall frame.
 const addref=arena+0x1a00;
 put(vt+4,addref);
-bytes(addref,[0xff,0x05,...u(seen+80),0xb8,2,0,0,0,0xc2,4,0]);
+bytes(addref,[0xff,0x05,...u(seen+80),0xb8,...u(0x80000001),0xc2,4,0]);
 bytes(release,[0xff,0x05,...u(seen+84),0xb8,1,0,0,0,0xc2,4,0]);
 const registeredCreate=[0x89,0xe2,0x89,0x15,...u(seen+88),0x8b,0x44,0x24,4,0xa3,...u(seen+92),0x8b,0x44,0x24,16,0xa3,...u(seen+96),0xc7,0,...u(object),0x31,0xc0,0xc2,16,0];
 bytes(create,registeredCreate);start(coCreate);finish(0,object);

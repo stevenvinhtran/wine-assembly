@@ -2301,6 +2301,8 @@
     (local $f i32)
     (local.set $f (call $com_activate_frame_begin (local.get $ppv)))
     (call $gs32 (local.get $f) (local.get $factory))
+    ;; Distinguish AddRef's unsigned count from DllGetClassObject's HRESULT.
+    (call $gs32 (i32.add (local.get $f) (i32.const 4)) (i32.const -1))
     (call $io_apc_push (local.get $factory))
     (call $io_apc_push (global.get $com_gco_thunk))
     (call $com_jump (call $gl32 (i32.add (call $gl32 (local.get $factory)) (i32.const 4)))))
@@ -2321,6 +2323,12 @@
     (local.set $f (i32.load offset=16 (global.get $reg_base)))
     (local.set $e (i32.add (local.get $f) (i32.const 20)))
     (local.set $pf (call $gl32 (local.get $f)))
+    (if (i32.eq (call $gl32 (i32.add (local.get $f) (i32.const 4))) (i32.const -1))
+      (then
+        ;; IUnknown::AddRef returns ULONG, including valid high-bit counts.
+        ;; Only the following CreateInstance return is an HRESULT.
+        (i32.store offset=0 (global.get $reg_base) (i32.const 0))
+        (call $gs32 (i32.add (local.get $f) (i32.const 4)) (i32.const 1))))
     ;; F+4 mode tag is read before normal CreateInstance may reuse it for HR.
     (if (i32.eqz (call $gl32 (i32.add (local.get $f) (i32.const 4))))
       (then
