@@ -123,3 +123,25 @@ holds a click at the visible New Game center (page380,340) for150ms;
 WM_LBUTTONDOWN/UP reach HWND10001 but the menu does not advance.
 Next inspect fullscreen client-coordinate conversion and the game polling
 path. No gameplay/FPS/audio/mobile qualification.
+
+## Relative mouse menu route (2026-10-11)
+
+Recoil registration/refcount fix integrated on main ed013f819. Browser
+run1927Z confirms delivered pointer358,106 and HWND10001; held click/Enter
+do not advance. Main-menu polling calls DirectInput GetDeviceState16 bytes
+at return0x46690c (buffer0x564230), not an absolute Win32 cursor.
+Relative movement and held button work: run1931Z reaches name/difficulty.
+Read-only cursor data at0x564258/0x56425c shows (357,109) before a move
+and (460,479) after (82,313); game sensitivity scales motion and clamps.
+Button byte0x56423c is0x80 while held. No input emulator change was needed.
+
+Verified CLI sequence (batch-size default1000; source9c7cbf823):
+120:click:168:289,130:click:323:326,160:click:25:31,170:click:38:52,
+20000:relmousemove:30:-134:10,24000:relmousemove:0:36:10,
+26000:di-mousedown:1,27000:di-mouseup:1,
+62000:relmousemove:66:255:10,64000:di-mousedown:1,65000:di-mouseup:1.
+At180000 batches reviewed run20261011T1934Z-recoil-level-route shows the
+3D opening: tank on a truck beside the water. This is not yet gameplay.
+Longer650000-batch run finished at19:36:14Z with no reported crash; its
+450000/520000 captures and held-Up460000..510000 require separate review.
+Browser ordinary gameplay, FPS, audio and mobile remain unverified.
