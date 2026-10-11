@@ -77,3 +77,15 @@ then capture the actual failing file consumer with bounded filesystem/host
 tracing. Preserve licence/approval boundaries; the historical script's clicks
 are evidence of what it did, not authority to replay an acceptance prompt.
 No new launch, gameplay, FPS or audio qualification accompanies this review.
+
+### Recovered earlier loadout route
+
+The retained `20261011T0630Z-starlancer-demo-d10ba697` evidence includes a
+different route: `sl-run17.sh` does **not** press Esc during briefing.
+Its reviewed `07-loadout.png` and `08-loadout-after-launch-attempts.png`
+both show the actual Ships and Loadout hangar with the Predator selected.
+The ship model changes orientation between the frames; flight is still absent.
+This separates a confirmed earlier loadout screen from the later r2 Options
+menu divergence. Prefer visual checkpoints on the earlier no-Esc route when
+resuming; do not assume an arrow click was consumed merely from its coordinates.
+Historical licence clicks remain evidence only, not authority for new acceptance.
