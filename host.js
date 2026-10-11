@@ -2259,8 +2259,6 @@ class WineAssembly {
       }
       if (!self._children) {
         self._children = new Map();
-        // A parent that ends takes its children with it.
-        self._stopChildren = () => { for (const c of self._children.values()) if (c.wine && c.exitCode === 259) c.wine.stop(); };
       }
       if (pipes && !self._childSegment) {
         self._childSegment = new Vlan.LoopbackSegment();
@@ -4651,8 +4649,10 @@ class WineAssembly {
   // repaint had the opposite fault: a crash left the dead app's last frame on
   // screen. Repainting last, once, fixes both.
   stop(options = {}) {
-    // Child processes this guest started (process_spawn) end with it.
-    if (this._stopChildren) { const stopKids = this._stopChildren; this._stopChildren = null; stopKids(); }
+    // Windows child processes outlive the process that created them. In
+    // particular, a launcher handoff may deliberately terminate its caller.
+    // Explicit TerminateProcess targets one process; the shell's Stop All
+    // enumerates all running apps when the user wants the entire session gone.
     if (this._manifestAssetAbort) this._manifestAssetAbort.abort();
     if (this._backgroundAssetJobs) this._backgroundAssetJobs.length = 0;
     // Put the final frame on the canvas before stepping ends, then drop the

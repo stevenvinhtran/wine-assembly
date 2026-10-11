@@ -475,3 +475,26 @@ fails the new D3D8 primary-handle assertion; the repaired full build and four
 tests (cross-API adapter monitor, monitor selection, monitor enumeration,
 D3D9 adapter) pass at 21:26:56Z. The original 420-second game route starts
 as PID899039 on bx_hx8msa33 after those checks; consumer result is pending.
+
+### Cross-process lookup and child lifetime (2026-10-11)
+
+The held desktop FindWindow bridge (9ef79f697, 692c9c43c, c27e6776b)
+passes distinct WASM-instance and real Worker RPC controls. The original
+420-second browser route in `scratch/runs/20261011T0946Z-iw-find-window-original`
+uses the retained tracked-launcher/named-sync/monitor source, not current main.
+It reaches the original menu and Start Game confirmation through ordinary
+keys. At 09:49:33Z the launcher receives DISPLAY1 and the requested
+`M1_Seattle_MercDistrict_Sak.gmp?-LoadTravel` command. The parent calls
+FindWindow once, then immediately calls TerminateProcess(-1, -1), rather
+than spending 120 seconds looking for the launcher. Both processes disappear;
+there is no gameplay. The browser closes normally at 09:53:01Z.
+
+The next concrete fault is browser host process lifetime: `process_spawn`
+installed `_stopChildren`, and every `stop()` called it. Thus a deliberate
+parent self-exit kills its live launcher. Windows process ancestry does not
+imply this termination contract. The candidate removes that cascade; explicit
+TerminateProcess(child) still stops that child, and shell Stop All enumerates
+the running apps. The regression exercises actual host process_spawn/stop:
+restoring the old cascade fails, and the candidate passes along with the
+child process-object and ShellExecuteEx tests on the boat. Original-game
+revalidation is required; these controls alone do not qualify gameplay.
