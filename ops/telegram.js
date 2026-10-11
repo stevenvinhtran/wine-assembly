@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
-const {createBot,hash}=require('./telegram-core');
+const {createBot,hash,COMMANDS}=require('./telegram-core');
 const replies=require('./telegram-replies');
+const inboxLib=require('./telegram-inbox');
 const root=path.resolve(__dirname,'..'),dir=path.join(root,'scratch/telegram');
 const base=process.env.OPS_URL||'http://127.0.0.1:8098';
 if(!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(base))throw Error('OPS_URL must be loopback HTTP');
 async function atomic(file,data){await fs.writeFile(file+'.tmp',JSON.stringify(data,null,2)+'\n',{mode:0o600});await fs.rename(file+'.tmp',file);}
 async function findLog(agentId){
-  const id=agentId?.replace(/^codex:/,'');if(!/^[a-f0-9-]{36}$/.test(id||''))return null;
-  const start=process.env.CODEX_SESSIONS_ROOT||path.join(os.homedir(),'.codex/sessions');
+  const claude=/^claude:/.test(agentId||''),id=agentId?.replace(/^(codex|claude):/,'');if(!/^[a-f0-9-]{36}$/.test(id||''))return null;
+  const start=claude?process.env.CLAUDE_PROJECTS_ROOT||path.join(os.homedir(),'.claude/projects'):process.env.CODEX_SESSIONS_ROOT||path.join(os.homedir(),'.codex/sessions');
   async function walk(d,depth){if(depth>4)return null;for(const e of await fs.readdir(d,{withFileTypes:true})){const f=path.join(d,e.name);if(e.isFile()&&e.name.endsWith(id+'.jsonl'))return f;if(e.isDirectory()){const found=await walk(f,depth+1);if(found)return found;}}return null;}
   return walk(start,0);
 }
@@ -32,11 +33,36 @@ async function main(){
     let r;try{r=await fetch(base+endpoint,{method:body?'POST':'GET',headers:{Origin:base,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(8000)});}catch{throw Error('Local dashboard unavailable');}
     if(!r.ok){const error=Error((await r.text()).slice(0,300));error.status=r.status;throw error;}return r.json();
   }
-  const save=()=>atomic(file,state),bot=createBot({state,save,telegram,local});
+  // Every image and file the owner sends is saved here, so the orchestrator can open it by path.
+  // The Bot API serves files up to 20 MB.
+  async function download(attachment,messageId){
+    if(attachment.file_size>20*1024*1024)throw Error('over the Bot API 20 MB download limit');
+    const info=await telegram('getFile',{file_id:attachment.file_id});
+    if(!info.file_path)throw Error('Telegram returned no file path');
+    const r=await fetch('https://api.telegram.org/file/bot'+token+'/'+info.file_path,{signal:AbortSignal.timeout(60000)});
+    if(!r.ok)throw Error('download failed ('+r.status+')');
+    const name=path.basename(attachment.file_name||info.file_path).replace(/[^A-Za-z0-9._-]/g,'_').slice(-80);
+    const inbox=path.join(dir,'inbox');await fs.mkdir(inbox,{recursive:true,mode:0o700});
+    const out=path.join(inbox,new Date().toISOString().replace(/[:.]/g,'-')+'-'+messageId+'-'+name);
+    await fs.writeFile(out,Buffer.from(await r.arrayBuffer()),{mode:0o600});return out;
+  }
+  const inboxFile=path.join(root,inboxLib.INBOX);
+  const inbox=entry=>inboxLib.appendInbox(inboxFile,entry);
+  async function inboxStatus(){
+    let consumers=[];try{consumers=JSON.parse(await fs.readFile(path.join(root,'ops/work-watchdog.json'),'utf8')).telegramInbox?.consumers||[];}catch{}
+    const entries=await inboxLib.readInbox(inboxFile);
+    return {last:entries.at(-1)?.id||0,consumers:consumers.map(c=>({agent:c.agent,cursor:inboxLib.readCursorSync(inboxLib.cursorPath(dir,c.agent))}))};
+  }
+  const save=()=>atomic(file,state),bot=createBot({state,save,telegram,local,download,inbox,inboxStatus});
+  // Messages left in the old pane-typing queue move to the inbox instead of being dropped.
+  if(state.chatQueue?.length||state.chatAttempt){
+    for(const item of [...(state.chatAttempt?[state.chatAttempt]:[]),...(state.chatQueue||[])])await inbox({text:item.text,attachments:[],at:new Date(item.at||Date.now()).toISOString()});
+    delete state.chatQueue;delete state.chatAttempt;await save();
+  }
   if(state.replyPolicyVersion!==2){state.replyQueue=(state.replyQueue||[]).filter(x=>x.direct);state.replyPolicyVersion=2;state.replyDeliveryVersion=1;await save();}
   const me=await telegram('getMe',{});console.log('Telegram bridge connected: @'+me.username);
   const webhook=await telegram('getWebhookInfo',{});if(webhook.url)throw Error('Bot has a webhook configured; remove it before long polling');
-  await telegram('setMyCommands',{commands:[{command:'status',description:'Current work and blockers'},{command:'screen',description:'Orchestrator terminal'},{command:'approvals',description:'Review pending approval'},{command:'queue',description:'Waiting messages'},{command:'cancel',description:'Cancel waiting messages'},{command:'help',description:'Chat and approval help'}]});
+  await telegram('setMyCommands',{commands:COMMANDS});
   let log=null,logId=null;
   const typingTimer=setInterval(()=>{void bot.typing();},4000);typingTimer.unref();
   while(true){
@@ -44,7 +70,6 @@ async function main(){
       const updates=await telegram('getUpdates',{offset:state.offset,timeout:5,allowed_updates:['message','callback_query']});
       for(const update of updates){state.offset=update.update_id+1;await save();try{await bot.handle(update);}catch{if(state.owner)await bot.send('Bridge request failed. Use /status or /screen to check; actions are not automatically replayed.').catch(()=>{});}}
       if(state.owner){
-        await bot.drainChat();
         // Approval monitoring must not hold up replies when the dashboard is unavailable.
         try{
           const snapshot=await local('/api/state');

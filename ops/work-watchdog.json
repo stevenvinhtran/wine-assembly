@@ -1,0 +1,32 @@
+{
+  "enabled": true,
+  "terminals": [
+    "claude-launch-ux",
+    "claude-myth",
+    "claude-tr3",
+    "claude-w4",
+    "claude-w5",
+    "claude-w6",
+    "claude-orchestrator"
+  ],
+  "unassignedMs": 600000,
+  "idleMs": 120000,
+  "cooldownMs": 900000,
+  "maxUnchangedNudges": 2,
+  "telegramInbox": {
+    "staleMs": 180000,
+    "cooldownMs": 900000,
+    "consumers": [
+      {"agent": "claude-80aa9e95", "agentId": "claude:80aa9e95", "kind": "claude"}
+    ],
+    "note": "Bot appends to scratch/telegram/inbox.jsonl; each consumer keeps scratch/telegram/inbox.<agent>.cursor (last id read). agentId resolves the pane via ops/terminals.json."
+  },
+  "excludedTasks": [
+    "CLAUDE-HEROES2-TIMING-FIX",
+    "CLAUDE-HEROES2-LATCH-REVIEW",
+    "GAMEPLAY-heroes-2-demo"
+  ],
+  "note": "RESUMED 2026-10-10 (user): Claude track restarted; dispatcher claude-orchestrator assigns ready tasks to idle workers. Heroes II timing/music work belongs to the laptop; the box must not restart it. Review-state tasks may already be merged: reconcile before any implementation.",
+  "paused": false,
+  "dispatcher": "claude-orchestrator"
+}

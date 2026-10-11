@@ -2,11 +2,74 @@
   "terminals": [
     {
       "id": "orchestrator",
-      "agentId": "codex:01a0f9d8-c0cd-73b3-a357-fb3ff1c784c0",
-      "label": "Orchestrator",
+      "agentId": "codex:01a0ff91-cf9d-7f42-ba93-f9e7616b35a5",
+      "label": "Codex coordinator · Telegram",
       "session": "wine-orchestrator",
-      "pane": "%0",
-      "panePid": 80668
+      "pane": "%14",
+      "panePid": 2312213
+    },
+    {
+      "id": "claude-orchestrator",
+      "agentId": "claude:80aa9e95-435b-4acb-aeea-8ae3d860613c",
+      "label": "Claude orchestrator (stopped)",
+      "session": "wine-claude-orchestrator",
+      "pane": "%6",
+      "panePid": 3281208,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "claude-tr3",
+      "agentId": "claude:202b4b39-6838-4802-a2d9-03dd6d3cd1d8",
+      "label": "Claude · Tomb Raider III demo",
+      "session": "wine-claude-tr3",
+      "pane": "%7",
+      "panePid": 3283984,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "claude-w5",
+      "agentId": "claude:90024109-c92c-41c8-8c1a-fd5ae13f85da",
+      "label": "Claude · worker w5",
+      "session": "wine-claude-w5",
+      "pane": "%9",
+      "panePid": 3684194,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "claude-launch-ux",
+      "agentId": "claude:1863d2b5-bc58-4c0b-9c15-00fc951f0256",
+      "label": "Claude · GL/D3D + Deus Ex",
+      "session": "wine-claude-launch-ux",
+      "pane": "%12",
+      "panePid": 634943,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "claude-myth",
+      "agentId": "claude:d10ba697-f69c-4855-aeff-e6a61b6e2735",
+      "label": "Claude · Myth worker",
+      "session": "wine-claude-myth",
+      "pane": "%13",
+      "panePid": 765792,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "claude-w6",
+      "agentId": "claude:d44753dd-b6da-4c7f-ada5-48d4d72fccd5",
+      "label": "Claude · w6",
+      "session": "wine-claude-w6",
+      "pane": "%18",
+      "panePid": 2897276,
+      "permissionMode": "bypass"
+    },
+    {
+      "id": "claude-w4",
+      "agentId": "claude:65967384-f1a3-4c67-9257-ecc5f4c71983",
+      "label": "Claude · worker w4",
+      "session": "wine-claude-w4",
+      "pane": "%20",
+      "panePid": 3666750,
+      "permissionMode": "bypass"
     }
   ]
 }

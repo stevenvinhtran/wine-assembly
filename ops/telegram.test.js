@@ -7,6 +7,40 @@ function fixture(){const state={owner:{userId:10,chatId:10}},calls=[],actions=[]
  const bot=createBot({state,save:async()=>{},telegram:async(method,body)=>{calls.push({method,body});return {message_id:20};},local:async(url,body)=>{if(url==='/api/state')return {tasks:[],approvals:{items:live?[live]:[]}};actions.push({url,body});return {sent:true};}});
  return {state,bot,calls,actions,live:p=>live=p};}
 const message=(text,id=10,type='private')=>({message:{text,date:Date.now()/1000,from:{id},chat:{id,type}}});
+test('/blockers matches dashboard grouping and stays read-only for authorized users',async()=>{
+ const snapshot={tasks:[
+  {id:'root',title:'Restore game files',status:'blocked',line:1,needs:'Restore archive',blocker:'Files absent',owner:'codex:one'},
+  {id:'child',title:'Verify game',status:'blocked',line:2,dependencies:['root']},
+  {id:'done',title:'Old blocker',status:'done',blocker:'Resolved'},
+  {id:'review',title:'Review validation',status:'blocked',line:3,waitingOn:'Automated review',blocker:'Review stopped execution'},
+ ],approvals:{items:[{reason:'Check exact command',terminalId:'orchestrator'},{reason:'Old approval',sent:true}]},terminals:[{agentId:'codex:one',label:'Fixture owner'}]};
+ const calls=[],reads=[],state={owner:{userId:10,chatId:10}};
+ const bot=createBot({state,save:async()=>{},telegram:async(method,body)=>{calls.push({method,body});return{};},local:async(url,body)=>{assert.equal(body,undefined);reads.push(url);return snapshot;}});
+ await bot.handle(message('/blockers',11));await bot.handle(message('/blockers',10,'group'));
+ assert.equal(reads.length,0);
+ await bot.handle(message('/blockers@wine_bot'));
+ assert.deepEqual(reads,['/api/state']);assert.equal(state.chatQueue,undefined);
+ const text=calls.map(x=>x.body.text).join('\n');
+ assert.match(text,/1 live approvals · 2 primary blockers · 1 dependent tasks/);
+ assert.match(text,/Next: Restore archive/);assert.match(text,/Reason: Files absent/);assert.match(text,/Owner: Fixture owner/);
+ assert.match(text,/Also holds up: Verify game \[child\]/);assert.match(text,/No dashboard override/);
+ assert(!text.includes('Old blocker'));assert(!text.includes('Old approval'));
+ assert.match(text,/1 need your input · 1 agent-resolvable/);assert.match(text,/NEEDS YOUR INPUT\n\nReview validation \[review\]/);assert.match(text,/AGENT-RESOLVABLE\n\nRestore game files \[root\]/);assert.match(text,/Who: No waitingOn recorded/);
+});
+test('/blockers empty state and command menu/help share the command catalog',async()=>{
+ const f=fixture();f.live(null);await f.bot.handle(message('/blockers'));
+ assert.match(f.calls.at(-1).body.text,/No blocked tasks recorded/);
+ await f.bot.handle(message('/help'));
+ const {COMMANDS}=require('./telegram-core');
+ assert(COMMANDS.some(x=>x.command==='blockers'));
+ for(const c of COMMANDS)assert(f.calls.at(-1).body.text.includes('/'+c.command+' — '+c.description));
+ assert.equal(f.actions.length,0);
+});
+test('Remote Codex capitalized model footer permits an empty prompt and exact chat submission',()=>{
+ assert(chatReady('› Ask Codex to do anything\n\n  GPT-6-Astra medium · ~/wine-assembly'));
+ assert.equal(chatSubmitKey('› [Telegram] hello\n\n  GPT-6-Astra medium · ~/wine-assembly','[Telegram] hello'),'Enter');
+ assert(!chatReady('› existing draft\n\n  GPT-6-Astra medium'));
+});
 test('Telegram ignores other users and groups; chat never becomes a direct approval',async()=>{const f=fixture();await f.bot.handle(message('hello',11));await f.bot.handle(message('hello',10,'group'));assert.equal(f.actions.length,0);await f.bot.handle(message('yes'));assert.equal(f.actions[0].url,'/api/orchestrator-chat');assert.equal(f.actions[0].body.message,'yes');});
 test('Pairing requires secret, expiry, private account; only one owner',async()=>{const f=fixture();delete f.state.owner;f.state.pairing={hash:hash('f'.repeat(32)),expires:Date.now()+1000};await f.bot.handle(message('/start '+'e'.repeat(32)));assert(!f.state.owner);await f.bot.handle(message('/start '+'f'.repeat(32)));assert.equal(f.state.owner.userId,10);assert.match(f.calls[0].body.text,/Hi!/);await f.bot.handle(message('/start '+'f'.repeat(32),11));assert.equal(f.state.owner.userId,10);});
 test('Approval binds user/message/exact prompt, consumes before dispatch and rejects replay',async()=>{const f=fixture();await f.bot.notifyApproval(prompt);const cb={callback_query:{id:'q',from:{id:10},message:{message_id:20,chat:{id:10,type:'private'}},data:'a:'+prompt.id}};await f.bot.handle({...cb,callback_query:{...cb.callback_query,from:{id:11}}});assert.equal(f.actions.length,0);await f.bot.handle(cb);assert.equal(f.actions.length,1);assert.deepEqual(f.actions[0].body,{id:prompt.id,decision:'accept'});await f.bot.handle(cb);assert.equal(f.actions.length,1);});
@@ -28,10 +62,22 @@ test('Plain start explains pairing without granting access',async()=>{
 });
 test('Chat submission follows the busy queue footer and requires the exact draft',()=>{
  const busy='Working\n› [Telegram] status\n\n  tab to queue message 69% context left';
- assert.equal(chatSubmitKey(busy,'[Telegram] status'),'Tab');
+ assert.equal(chatSubmitKey(busy,'[Telegram] status'),'Enter');
  assert.equal(chatSubmitKey(busy,'different draft'),null);
  assert.equal(chatSubmitKey('Would you like to run the following command?\n'+busy,'[Telegram] status'),null);
  assert.equal(chatSubmitKey('› [Telegram] status\n\n gpt-6-astra medium','[Telegram] status'),'Enter');
+});
+test('Chat submission accepts a long paste Codex collapsed into a [Pasted Content N chars] placeholder',()=>{
+ const head='[Telegram] Jezzball crashes when '+'the ball hits a wall. '.repeat(46),tail='Steps: open it, start a game, wait.';
+ const msg=head+tail,n=head.length;assert(n>1000);
+ const screen=n=>'Working\n› [Pasted Content '+n+' chars]'+tail+'\n\n  tab to queue message 61% context left';
+ assert.equal(chatSubmitKey(screen(n),msg),'Enter');
+ assert.equal(chatSubmitKey('› [Pasted Content '+n+' chars] '+tail+'\n\n gpt-6-astra medium',msg),'Enter');
+ assert.equal(chatSubmitKey(screen(n+1),msg),null,'wrong N leaves a different tail');
+ assert.equal(chatSubmitKey(screen(n),msg+' extra'),null,'tail must match');
+ assert.equal(chatSubmitKey(screen(msg.length+5),msg),null,'N past the end');
+ const emoji='[Telegram] 🎮 '+'x'.repeat(1100);
+ assert.equal(chatSubmitKey('› [Pasted Content '+Array.from(emoji).length+' chars]end\n\n gpt-6-astra medium',emoji+'end'),'Enter');
 });
 test('Approval dedup survives dashboard IDs changing; callback resolves fresh ID',async()=>{
  const f=fixture();await f.bot.notifyApproval(prompt);
@@ -99,9 +145,9 @@ test('An existing approval is reformatted in place without another notification'
 test('Chat waits durably on explicit pre-input rejection, then delivers once',async()=>{
  const state={owner:{userId:10,chatId:10}},messages=[];let blocked=true,attempts=0;
  const make=()=>createBot({state,save:async()=>{},telegram:async(method,body)=>{messages.push(body.text);return {};},local:async()=>{attempts++;if(blocked)throw Object.assign(Error('Orchestrator has a prompt or draft open. Resolve it before sending chat'),{status:409});return {sent:true};}});
- await make().handle(message('ascii tldr'));assert.equal(state.chatQueue.length,1);assert(!state.chatAttempt);
+ await make().handle(message('capture next game'));assert.equal(state.chatQueue.length,1);assert(!state.chatAttempt);
  const restarted=make();blocked=false;await restarted.drainChat();await restarted.drainChat();
- assert.equal(state.chatQueue.length,0);assert.equal(attempts,2);assert.equal(state.lastChat.text,'ascii tldr');
+ assert.equal(state.chatQueue.length,0);assert.equal(attempts,2);assert.equal(state.lastChat.text,'capture next game');
 });
 test('Ambiguous delivery is never replayed, and waiting messages can be cancelled',async()=>{
  const state={owner:{userId:10,chatId:10}};let attempts=0;
@@ -113,10 +159,51 @@ test('Ambiguous delivery is never replayed, and waiting messages can be cancelle
 test('Successful chat uses typing instead of a queued reply and stops after the answer or approval',async()=>{
  const state={owner:{userId:10,chatId:10}},calls=[];let time=Date.now();
  const bot=createBot({state,now:()=>time,save:async()=>{},local:async()=>({sent:true}),telegram:async(method,body)=>{calls.push({method,body});return {};}});
- await bot.handle(message('status'));assert.equal(calls.length,1);assert.equal(calls[0].method,'sendChatAction');assert.equal(calls[0].body.action,'typing');
+ await bot.handle(message('check the game screenshots'));assert.equal(calls.length,1);assert.equal(calls[0].method,'sendChatAction');assert.equal(calls[0].body.action,'typing');
  await bot.typing();assert.equal(calls.length,1);
  time+=4000;await bot.typing();assert.equal(calls.length,2);
  state.pending={};time+=4000;await bot.typing();assert.equal(calls.length,2);
  state.pending=null;state.lastDirectReplyAt=time;await bot.typing();assert.equal(calls.length,2);
  state.lastDirectReplyAt=0;time+=11*60000;await bot.typing();assert.equal(calls.length,2);
+});
+test('Status questions reply from dated dashboard state without touching a busy terminal',async()=>{
+ const calls=[],requests=[],state={owner:{userId:10,chatId:10}};
+ const bot=createBot({state,save:async()=>{},telegram:async(method,body)=>{calls.push({method,body});return {message_id:42};},local:async url=>{requests.push(url);assert.equal(url,'/api/state');return {tasks:[],projectStatus:{available:true,body:'Checking gameplay screenshots.',updatedAt:'2026-10-03T09:00:00Z'}};}});
+ for(const text of ["whtas' latest",'sup','/status','ascii art tldr status'])await bot.handle(message(text));
+ assert.equal(requests.length,4);assert.equal(calls.length,4);
+ assert(calls.every(c=>c.method==='sendMessage'&&c.body.text.includes('TASK STATUS')&&c.body.text.includes('2026-10-03 09:00 UTC')));
+ assert.equal(calls[3].body.entities[0].type,'pre');
+ assert.equal(calls[3].body.entities[0].length,calls[3].body.text.length);
+ assert(!calls[0].body.entities);
+ assert.equal(state.chatQueue,undefined);assert.equal(state.lastStatusDelivery.messageId,42);
+});
+test('TLDR stays bounded for a large ledger and never dumps STATUS prose',()=>{
+ const {statusText}=require('./telegram-status');
+ const snapshot={tasks:Array.from({length:200},(_,i)=>({status:i<10?'active':'blocked',title:'Gameplay qualification '.repeat(20)})),candidates:[],projectStatus:{body:'SECRET_LONG_PROSE'.repeat(100)}};
+ const text=statusText(snapshot,{ascii:true});
+ assert(text.length<1100);assert(!text.includes('SECRET_LONG_PROSE'));
+ assert.match(text,/ACTIVE  10/);assert.match(text,/BLOCKED 190/);
+ assert(text.split('\n').every(line=>line.length===50));
+});
+test('Busy terminal keeps actionable chat queued with typing, without Saved chatter',async()=>{
+ const calls=[],state={owner:{userId:10,chatId:10}};
+ const bot=createBot({state,save:async()=>{},telegram:async(method,body)=>{calls.push({method,body});return {};},local:async()=>{const e=Error('Orchestrator has a prompt or draft open.');e.status=409;throw e;}});
+ await bot.handle(message('capture the next game'));
+ assert.equal(state.chatQueue.length,1);assert.deepEqual(calls.map(c=>c.method),['sendChatAction']);
+});
+test('Owner images are downloaded and forwarded to the orchestrator by path, with the caption',async()=>{
+ const state={owner:{userId:10,chatId:10}},actions=[],fetched=[];
+ const bot=createBot({state,save:async()=>{},telegram:async()=>({message_id:20}),local:async(url,body)=>{if(url==='/api/state')return {tasks:[],approvals:{items:[]}};actions.push({url,body});return {sent:true};},
+  download:async(attachment,messageId)=>{fetched.push(attachment.file_id);return '/inbox/'+messageId+'.jpg';}});
+ const base={date:Date.now()/1000,from:{id:10},chat:{id:10,type:'private'}};
+ await bot.handle({message:{...base,message_id:7,caption:'what is wrong here?',photo:[{file_id:'small'},{file_id:'large'}]}});
+ assert.deepEqual(fetched,['large']);
+ assert.equal(actions[0].url,'/api/orchestrator-chat');
+ assert.match(actions[0].body.message,/^what is wrong here\?\n\[image attached: \/inbox\/7\.jpg/);
+ await bot.handle({message:{...base,message_id:8,document:{file_id:'doc',mime_type:'image/png'}}});
+ assert.deepEqual(fetched,['large','doc']);assert.match(actions[1].body.message,/^\[image attached: \/inbox\/8\.jpg/);
+ await bot.handle({message:{...base,message_id:9,document:{file_id:'zip',mime_type:'application/zip'}}});
+ // Every file the owner sends is saved and forwarded by path, not only images.
+ assert.deepEqual(fetched,['large','doc','zip']);
+ assert.match(actions[2].body.message,/^\[document attached: \/inbox\/9\.jpg\]$/);
 });
