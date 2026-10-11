@@ -517,7 +517,9 @@ Disassembly and a real-WASM API probe on 2026-10-11 identify another missing
 contract. In DX2, 0x4027f0 obtains GetCurrentProcess. The seven arguments
 pushed through 0x402806 duplicate that pseudo handle into the launcher
 process, with DUPLICATE_SAME_ACCESS (2). The output at stack+0x20 is then
-posted as lParam of message 0x400 to the launcher (call at 0x402818).
+sent as lParam of message 0x400 to the launcher (call at 0x402818).
+Correction from the original import table: this is **SendMessageA** at IAT
+0x904478, not PostMessageA as the initial diagnosis stated.
 The launcher's handler at 0x40377a stores lParam into 0x40c048.
 Its wait loop at 0x4033a0 initializes that variable to -1 and waits up to
 120000 ms for it to change.
@@ -528,8 +530,9 @@ target tracked child handle 0x00e44004, and DUPLICATE_SAME_ACCESS. It reports
 success=1 and writes 0xffffffff, precisely the launcher's waiting sentinel.
 The current implementation copies this process pseudo handle unchanged;
 its special conversion covers the current-thread pseudo handle only.
-This is strong evidence for the observed 122-second delay, although the
-actual original PostMessage payload has not yet been captured live.
+This identifies a required handle contract. It does not by itself explain
+the full delay: the later original-game test below still waits 122 seconds
+with a real alias, and synchronous cross-process message delivery is absent.
 
 The required implementation is a process object and handle in the target
 process, whose wait/exit status refers to the original process after that
@@ -580,8 +583,42 @@ OS processes used by the CLI lack the required IPC handle table and now
 return ERROR_NOT_SUPPORTED for process duplication instead of fake success.
 The existing OpenProcess implementation retains its older access model.
 Evidence: `scratch/runs/20261011T1052Z-iw-process-aliases/`.
-Original-game latency and gameplay remain unverified on this candidate:
-`bx_qcuvw2yq:/home/user/deusex-iw-extracted-20261010` is not staged, and
-the attempted boat scp of the local original media was refused with
-`api_key_action_forbidden` (SSH action unavailable). No browser slot was
-claimed, no licence dialog answered, and no public deployment performed.
+The initial fixture transfer blocker was resolved by forking the preserved
+fixture-bearing boat snapshot. The original rerun below supersedes that hold.
+
+### Original process-alias validation and synchronous-message gap
+
+Run `20261011T1116Z-iw-process-alias-original` uses boat `bx_xes22t76`,
+forked from the original fixture-bearing snapshot with no inherited secrets.
+DX2.exe SHA-256 remains
+`da394a4b5eb6254d9bee648b4bb1bee557b516cca61bb24b55020d29bab72f46`.
+This is the retained source plus the documented process-alias patches,
+**not current main**; source hashes and loaded WASM hash are in identity.json.
+The full build and both process suites pass on that retained source.
+
+Ordinary menu input reaches Start Game. The host records the actual
+DuplicateHandle invocation returning target-owned alias `0xe60001`, with
+source process/handle both -1 and SAME_ACCESS=2. Parent exit then precedes
+the launcher's new DX2 spawn by **122587 ms**. The final reviewed 420-second
+screenshot still says LOADING. Chrome exits normally at 11:23:51Z, with no
+page errors. There is no gameplay, movement, FPS or audio qualification.
+Another fleet browser overlapped this run, so it is not a performance result.
+`test/binaries/tlbs/stdole2.tlb` was missing in this test root (HTTP404).
+
+The original PE import at IAT `0x904478` points to name RVA `0x5b2770`,
+**SendMessageA**. Earlier notes incorrectly called it PostMessage. Thus the
+absence of a host post_window_message event is expected. SendMessageA's
+current WAT path only resolves the current process's WND table and its
+same-process owner threads; it has no foreign-process request/reply route.
+The self-contained `probe-send.js` diagnostic uses two real WASM memories:
+the caller's actual SendMessageA handler returns zero without modifying the
+receiver; invoking the same receiver locally executes its x86 callback,
+stores `0xe60001`, and returns one. See probe-send-result.json.
+
+Next: implement synchronous foreign-process request/reply with execution on
+the receiving worker and preserved LRESULT, lifetime and reentrant-send
+semantics. Do not substitute PostMessage, shorten the timeout, or execute
+guest callbacks on the page's shadow instance. Convert the diagnostic into
+a passing transport regression, then repeat the original route with tracing
+of SendMessageA and the receiver's state. The alias implementation remains
+held for selective review; it has not fixed the complete launcher handoff.
