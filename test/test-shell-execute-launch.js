@@ -13,6 +13,39 @@ const fs = require('fs');
 const path = require('path');
 const { createBrowserShell } = require('../lib/browser-shell.js');
 
+// A real process_spawn record must survive its parent's host teardown.
+// The browser shell, rather than process ancestry, owns Stop All.
+{
+  const vm = require('vm');
+  let launch;
+  const context = {
+    console, URLSearchParams, setTimeout: () => 1, clearTimeout() {},
+    window: { wineShell: { launchVfsExe(file, parent, dir, args, options) {
+      launch = options;
+      return true;
+    } } },
+    createHostImports: () => ({ host: {}, gdi: {} }),
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'host.js'), 'utf8') +
+    '\n;globalThis.WineAssembly = WineAssembly;', context);
+  const parent = new context.WineAssembly();
+  parent.memory = { buffer: new ArrayBuffer(1024) };
+  parent.readString = () => 'child.exe';
+  const host = parent.getImports().host;
+  const pid = host.process_spawn(1, 0, 0, 0, 0, 1, 1);
+  assert(pid, 'tracked child launch succeeds');
+  let childStops = 0;
+  const child = { running: true, stop() { childStops++; this.running = false; } };
+  launch.beforeRun(child);
+  parent.stop({ repaint: false });
+  assert.strictEqual(childStops, 0, 'parent exit must not terminate its child');
+  assert.strictEqual(host.process_ctl(0, pid, 0), 259, 'child is still active after parent exit');
+  assert.strictEqual(host.process_ctl(1, pid, 7), 1, 'explicit child termination succeeds');
+  assert.strictEqual(childStops, 1, 'explicit termination stops exactly its target');
+  assert.strictEqual(host.process_ctl(0, pid, 0), 7, 'terminated child retains its exit code');
+  console.log('ok: child survives parent exit; explicit termination still works');
+}
+
 const apps = {
   wordpad:   { exe: 'binaries/win98-apps/wordpad.exe' },
   mspaint98: { exe: 'binaries/win98-apps/mspaint.exe' },
