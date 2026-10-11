@@ -89,3 +89,12 @@ This separates a confirmed earlier loadout screen from the later r2 Options
 menu divergence. Prefer visual checkpoints on the earlier no-Esc route when
 resuming; do not assume an arrow click was consumed merely from its coordinates.
 Historical licence clicks remain evidence only, not authority for new acceptance.
+
+The installed fixture remains at
+`/home/user/wine-assembly-web/test/binaries/candidates/starlancer-demo/installed`
+after the old boat expires. `DEFAULT.TXT` is an INI-style `[KeyConfig]` file,
+including arrows for steering, `]` for full throttle, Space for lasers and
+Enter for missiles. Inventory hashes are in
+`scratch/runs/20261011T1400Z-starlancer-fixture-audit/inventory.json`.
+Packed `lancer.exe` has no plain-text default.txt/profile-API match in this
+static scan; the actual runtime reader remains unproven.
