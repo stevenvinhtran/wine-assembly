@@ -25,14 +25,14 @@ const assert=require('assert'),path=require('path'),puppeteer=require('puppeteer
    const cases=[];
    // Position-only VS + fixed pixel stage: its unused diffuse alpha must not
    // prevent a colorless stencil-volume pass from linking (Invisible War).
-   const volume=(extra={},fixedExtra={})=>d.draw({vertexShader:vs,pixelShader:null,
+   const volume=(extra={},fixedExtra={},drawExtra={})=>d.draw({vertexShader:vs,pixelShader:null,
     primitive:4,primitiveCount:1,stride:16,
     vertices:new Uint8Array(new Float32Array([-1,-1,.5,1,3,-1,.5,1,-1,3,.5,1]).buffer),
     attributes:[{register:0,type:3,offset:0}],depthAttachment:a,
     fixedFunction:{lighting:false,fog:false,specular:false,textureFactor:0xff7f7f7f,
       stages:[{colorOp:2,colorArg1:3,colorArg2:0,alphaOp:1,texCoordIndex:0,transformFlags:0},{colorOp:1}],...fixedExtra},
     state:{cull:1,zenable:true,zwrite:false,zfunc:1,colorWriteMask:0,
-      stencilEnable:true,stencilFunc:8,stencilZFail:4,...extra}});
+      stencilEnable:true,stencilFunc:8,stencilZFail:4,...extra},...drawExtra});
    clear(9);volume();
    cases.push(g.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))[0]===0);
    cases.push(check(10)); // depth failure increments stencil, color stays clear
@@ -41,11 +41,39 @@ const assert=require('assert'),path=require('path'),puppeteer=require('puppeteer
    let missingColorRejected=false;
    try{volume({colorWriteMask:15});}catch(e){missingColorRejected=/d3d_color0/.test(e.message);}
    cases.push(missingColorRejected); // no default color invented for visible draws
-   for(const fixedExtra of [{alphaTest:true,alphaFunc:5,alphaRef:128},{colorKey:true}]){
+   for(const fixedExtra of [{alphaTest:true,alphaFunc:5,alphaRef:128}]){
     let rejected=false;
     try{volume({},fixedExtra);}catch(e){rejected=/d3d_color0/.test(e.message);}
     cases.push(rejected); // possible discard must retain its original fragment stage
    }
+   clear(0);volume({colorWriteMask:7,zenable:false,stencilEnable:false});
+   const rgb=g.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
+   cases.push(rgb[0]===127&&rgb[1]===127&&rgb[2]===127&&rgb[3]===255);
+   d.clear([.25,.25,.25,1],7,1,null,a,0);
+   volume({colorWriteMask:7,zenable:false,stencilEnable:false,blend:true,srcblend:9,dstblend:3});
+   const blended=g.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
+   cases.push(blended[0]>=62&&blended[0]<=66&&blended[3]===255);
+   for(const factor of [5,6,11]){
+    let rejected=false;
+    try{volume({colorWriteMask:7,blend:true,srcblend:factor});}
+    catch(e){rejected=/d3d_color0/.test(e.message);}
+    cases.push(rejected); // masked alpha is still live when RGB blending reads it
+   }
+   for(const arg of [0,1]){
+    let rejected=false;
+    try{volume({colorWriteMask:7},{stages:[{colorOp:2,colorArg1:arg,colorArg2:0,
+      alphaOp:1,texCoordIndex:0,transformFlags:0},{colorOp:1}]});}
+    catch(e){rejected=/d3d_color0/.test(e.message);}
+    cases.push(rejected); // diffuse/current RGB is observable even if alpha is masked
+   }
+   clear(9);
+   volume({zenable:false,stencilPass:3,stencilRef:42},{colorKey:true,
+    stages:[{colorOp:2,colorArg1:2,colorArg2:0,alphaOp:2,alphaArg1:2,alphaArg2:0,
+      texCoordIndex:0,transformFlags:0},{colorOp:1}]},{
+    vertexShader:new Uint32Array([0xfffe0101,1,0xc00f0000,0x90e40000,
+      1,0xe00f0000,0xa0e40000,1,0xd00f0000,0xa0e40000,0xffff]),vertexConstants:new Float32Array([0,0,0,0]),
+    textures:[{width:1,height:1,pixels:new Uint8Array([255,255,255,0])}]});
+   cases.push(check(9)); // keyed fragments must not update stencil even with mask=0
    for(const [func,expected]of [[1,false],[2,true],[3,false],[4,true],[5,false],[6,true],[7,false],[8,true]]){
     clear(8);draw({stencilFunc:func,stencilRef:7});
     cases.push((g.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))[0]===255)===expected);
