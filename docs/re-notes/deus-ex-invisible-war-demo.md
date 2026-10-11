@@ -510,3 +510,32 @@ about 122 seconds between parent termination and the new ShellExecuteEx;
 the cause of that delay and completion of level loading remain unverified.
 No movement, gameplay FPS or audio qualification comes from this run.
 Browser ownership was released for the queued user-first BG validation.
+
+### The remaining 120-second launcher wait
+
+Disassembly and a real-WASM API probe on 2026-10-11 identify another missing
+contract. In DX2, 0x4027f0 obtains GetCurrentProcess. The seven arguments
+pushed through 0x402806 duplicate that pseudo handle into the launcher
+process, with DUPLICATE_SAME_ACCESS (2). The output at stack+0x20 is then
+posted as lParam of message 0x400 to the launcher (call at 0x402818).
+The launcher's handler at 0x40377a stores lParam into 0x40c048.
+Its wait loop at 0x4033a0 initializes that variable to -1 and waits up to
+120000 ms for it to change.
+
+`scratch/runs/20261011T1010Z-iw-duplicate-process/probe-result.json` calls
+the actual DuplicateHandle WAT handler with source process/handle -1,
+target tracked child handle 0x00e44004, and DUPLICATE_SAME_ACCESS. It reports
+success=1 and writes 0xffffffff, precisely the launcher's waiting sentinel.
+The current implementation copies this process pseudo handle unchanged;
+its special conversion covers the current-thread pseudo handle only.
+This is strong evidence for the observed 122-second delay, although the
+actual original PostMessage payload has not yet been captured live.
+
+The required implementation is a process object and handle in the target
+process, whose wait/exit status refers to the original process after that
+process exits. CloseHandle must release the alias, and explicit termination
+must affect the referenced process. Do not replace -1 with a fabricated
+constant or shorten the game's timeout. Existing child PIDs are scoped to
+each parent's `_children` map, so merely copying their tagged integer into
+another process would also be incorrect. Original browser revalidation
+must verify both the shorter handoff and level completion after this fix.
