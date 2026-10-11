@@ -6,9 +6,10 @@ const assert=require('assert'),path=require('path'),puppeteer=require('puppeteer
  try{
   const page=await browser.newPage();
   for(const f of ['gpu-backend.js','d3d9-shader.js','d3d9-fixed.js','d3d9-backend.js'])await page.addScriptTag({path:path.join(__dirname,'../lib',f)});
-  const result=await page.evaluate(()=>{
+  for(const version of [1,2]){
+  const result=await page.evaluate(version=>{
    const canvas=document.createElement('canvas');canvas.width=canvas.height=4;
-   const d=new D3D9Backend.Device(canvas),g=d.gpu,gl=g.gl;
+   const d=new D3D9Backend.Device(canvas,{webglVersion:version}),g=d.gpu,gl=g.gl;
    const a={id:1,width:4,height:4,format:75},b={id:2,width:8,height:7,format:75};
    const vs=new Uint32Array([0xfffe0101,1,0xc00f0000,0x90e40000,0xffff]),ps=new Uint32Array([0xffff0101,1,0x800f0000,0xa0e40000,0xffff]);
    const draw=(state={},attachment=a,reverse=false)=>d.draw({vertexShader:vs,pixelShader:ps,primitive:4,primitiveCount:1,stride:16,
@@ -22,6 +23,29 @@ const assert=require('assert'),path=require('path'),puppeteer=require('puppeteer
     return g.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))[0]===255;
    };
    const cases=[];
+   // Position-only VS + fixed pixel stage: its unused diffuse alpha must not
+   // prevent a colorless stencil-volume pass from linking (Invisible War).
+   const volume=(extra={},fixedExtra={})=>d.draw({vertexShader:vs,pixelShader:null,
+    primitive:4,primitiveCount:1,stride:16,
+    vertices:new Uint8Array(new Float32Array([-1,-1,.5,1,3,-1,.5,1,-1,3,.5,1]).buffer),
+    attributes:[{register:0,type:3,offset:0}],depthAttachment:a,
+    fixedFunction:{lighting:false,fog:false,specular:false,textureFactor:0xff7f7f7f,
+      stages:[{colorOp:2,colorArg1:3,colorArg2:0,alphaOp:1,texCoordIndex:0,transformFlags:0},{colorOp:1}],...fixedExtra},
+    state:{cull:1,zenable:true,zwrite:false,zfunc:1,colorWriteMask:0,
+      stencilEnable:true,stencilFunc:8,stencilZFail:4,...extra}});
+   clear(9);volume();
+   cases.push(g.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))[0]===0);
+   cases.push(check(10)); // depth failure increments stencil, color stays clear
+   clear(9);volume({zfunc:8,stencilPass:3,stencilRef:42});cases.push(check(42));
+   clear(9);volume({stencilFunc:1,stencilFail:2});cases.push(check(0));
+   let missingColorRejected=false;
+   try{volume({colorWriteMask:15});}catch(e){missingColorRejected=/d3d_color0/.test(e.message);}
+   cases.push(missingColorRejected); // no default color invented for visible draws
+   for(const fixedExtra of [{alphaTest:true,alphaFunc:5,alphaRef:128},{colorKey:true}]){
+    let rejected=false;
+    try{volume({},fixedExtra);}catch(e){rejected=/d3d_color0/.test(e.message);}
+    cases.push(rejected); // possible discard must retain its original fragment stage
+   }
    for(const [func,expected]of [[1,false],[2,true],[3,false],[4,true],[5,false],[6,true],[7,false],[8,true]]){
     clear(8);draw({stencilFunc:func,stencilRef:7});
     cases.push((g.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))[0]===255)===expected);
@@ -46,8 +70,9 @@ const assert=require('assert'),path=require('path'),puppeteer=require('puppeteer
     try{clear(1,depth);errors.push(false);}catch(e){errors.push(true);}
    }
    const error=g.getError();d.destroy();return {cases,errors,error};
-  });
+  },version);
   assert(result.cases.every(Boolean),JSON.stringify(result));assert(result.errors.every(Boolean));assert.strictEqual(result.error,0);
+  }
   console.log('PASS GPU D24S8 stencil: 8 operations, fail/zfail/pass, masks, two-sided winding, oversized identity, rectangular Clear and release');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
