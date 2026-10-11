@@ -1071,6 +1071,9 @@ class WineAssembly {
     // created by ThreadManager are threads of this process and share its PID
     // through the process's SharedArrayBuffer-backed memory.
     this.processId = WineAssembly._nextProcessId++;
+    this._processObject = { wine: this, exited: false, exitCode: 259 };
+    this._processAliases = new Map();
+    this._nextProcessAlias = 1;
     // Every emulated process on this desktop shares named kernel objects.
     // The individual ThreadManagers still issue and close their own handles.
     if (typeof window !== 'undefined' && window.NamedSyncNamespace) {
@@ -2271,11 +2274,14 @@ class WineAssembly {
       if (self.threadManager) self.threadManager.processCtl = (op, p, arg) => h.process_ctl(op, p, arg);
       const ip = childIp >>> 0;
       const ipText = [ip >>> 24, (ip >>> 16) & 255, (ip >>> 8) & 255, ip & 255].join('.');
-      const pid = (0x4000 + (self._children.size + 1) * 4) & 0xFFFF;
+      const pid = self._nextChildPid || 0x4004;
+      if (pid > 0xFFFF) return 0;
+      self._nextChildPid = pid + 4;
       const rec = { wine: null, exitCode: 259, ip };
       self._children.set(pid, rec);
       const beforeRun = async (child) => {
         rec.wine = child;
+        rec.object = child._processObject;
         if (!pipes) return;
         await child.callGuest('set_vlan_local_ip', ip | 0);
         await child.callGuest('pipe_detach_console');
@@ -2316,6 +2322,25 @@ class WineAssembly {
     // op 0: exit code; op 1: terminate; op 2: process-record validity.
     // Validity is separate because 0xffffffff is a legitimate exit code.
     h.process_ctl = (op, pid, arg) => {
+      // Process aliases have their own namespace, distinct from child process
+      // (E4) and child thread (E5) handles. The object outlives its owning host.
+      if (op === 3) return self._duplicateProcessHandle(pid);
+      if (op >= 4 && op <= 8) {
+        const entry = self._processAliases.get(pid >>> 0);
+        if (!entry) return op === 8 ? -1 : -6;
+        const object = entry.object;
+        if (op === 6) return (entry.access & arg) === arg ? 1 : -5;
+        if (op === 7) { self._processAliases.delete(pid >>> 0); return 1; }
+        if (op === 4) return object.exitCode >>> 0;
+        if (op === 8) return !(entry.access & 0x100000) ? -1 : object.exited ? 0 : 0x102;
+        if (!(entry.access & 1)) return -5;
+        if (object.exited) return -5;
+        const target = object.wine;
+        if (!target) return -6;
+        target._exitCode = arg >>> 0;
+        target.stop();
+        return 1;
+      }
       const rec = self._children && self._children.get(pid & 0xFFFF);
       if (!rec) return -1;
       if (op === 2) return 1;
@@ -2325,12 +2350,13 @@ class WineAssembly {
           const child = rec.wine;
           rec.exitCode = arg >>> 0;
           if (self.vlanWire && self.vlanWire.peerGone) self.vlanWire.peerGone(rec.ip);
-          if (child) child.stop();
+          if (child) { child._exitCode = arg >>> 0; child.stop(); }
         }
         return 1;
       }
       return -1;
     };
+    self._processCtl = h.process_ctl;
     h.shell_execute = (hwnd, opWa, fileWa, paramsWa, dirWa, nShow) => {
       const rawFile = fileWa ? self.readString(fileWa) : '';
       const op = opWa ? self.readString(opWa) : 'open';
@@ -2753,6 +2779,10 @@ class WineAssembly {
   }
 
   async init(canvas) {
+    if (this._processObject.exited) {
+      this._processObject = { wine: this, exited: false, exitCode: 259 };
+      delete this._exitCode;
+    }
     const compileEl = typeof document !== 'undefined' && document.getElementById('compile-status');
     let showTimeout = null;
     const cacheWarm = !!WineAssembly._wasmModulePromise;
@@ -3117,6 +3147,7 @@ class WineAssembly {
     // Arm `g` (default on): one shared clock that stands at the earliest
     // overdue timed-sleep deadline (see ThreadManager). Not in frozen mode,
     // whose clock only moves when the agent steps it.
+    this.threadManager.processCtl = this._processCtl;
     this.threadManager.deadlineClock = !this._frozen && this._schedArm('g');
     // Its real time is continuous, not the stepped batch clock: the audible
     // cursor it is compared against moves continuously too, and a stepped
@@ -4650,7 +4681,63 @@ class WineAssembly {
   // exists -- desktop icons hidden over a blank canvas. The two sites with no
   // repaint had the opposite fault: a crash left the dead app's last frame on
   // screen. Repainting last, once, fixes both.
+  _processHandleEntry(handle) {
+    handle >>>= 0;
+    if (handle === 0xFFFFFFFF) return { object: this._processObject, access: 0x1FFFFF };
+    if ((handle & 0xFFFF0000) === 0x00E60000) return this._processAliases.get(handle);
+    if ((handle & 0xFFFF0000) === 0x00E40000) {
+      const record = this._children?.get(handle & 0xFFFF);
+      if (record?.object) return { object: record.object, access: 0x1FFFFF };
+    }
+    if (handle === (0xE2000 | (this.processId & 0xFFF))) {
+      return { object: this._processObject, access: 0x1FFFFF };
+    }
+    return null;
+  }
+
+  _duplicateProcessHandle(stackWa) {
+    // The stdcall frame is in the caller's shared memory, including when its
+    // main thread runs in a Worker. No pointer crosses into the target memory.
+    const frame = new DataView(this.memory.buffer, stackWa >>> 0, 32);
+    const sourceProcess = this._processHandleEntry(frame.getUint32(4, true));
+    const targetProcess = this._processHandleEntry(frame.getUint32(12, true));
+    const sourceHost = sourceProcess?.object.wine;
+    const targetHost = targetProcess?.object.wine;
+    const sourceHandle = frame.getUint32(8, true);
+    const options = frame.getUint32(28, true);
+    const source = sourceHost?._processHandleEntry(sourceHandle);
+    const closeSource = () => {
+      if ((options & 1) && sourceHost && (sourceHandle & 0xFFFF0000) === 0x00E60000) {
+        sourceHost._processAliases.delete(sourceHandle);
+      }
+      if ((options & 1) && sourceHost && (sourceHandle & 0xFFFF0000) === 0x00E40000) {
+        sourceHost._children?.delete(sourceHandle & 0xFFFF);
+      }
+    };
+    // DUPLICATE_CLOSE_SOURCE closes a real alias even when duplication fails.
+    try {
+      if (!sourceHost || !targetHost || !source) return -6;
+      if (!frame.getUint32(16, true)) return -87;
+      if (!(sourceProcess.access & 0x40) || !(targetProcess.access & 0x40)) return -5;
+      if (options & ~3) return -87;
+      const access = options & 2 ? source.access : frame.getUint32(20, true);
+      if ((access & source.access) !== access) return -5;
+      if (targetHost._nextProcessAlias > 0xFFFF) return -4;
+      const handle = 0x00E60000 | targetHost._nextProcessAlias++;
+      targetHost._processAliases.set(handle, {
+        object: source.object, access, inherit: !!frame.getUint32(24, true),
+      });
+      return handle;
+    } finally { closeSource(); }
+  }
+
   stop(options = {}) {
+    if (!this._processObject.exited) {
+      this._processObject.exited = true;
+      this._processObject.exitCode = (this._exitCode ?? 0) >>> 0;
+      this._processObject.wine = null;
+      this._processAliases.clear();
+    }
     // Windows child processes outlive the process that created them. In
     // particular, a launcher handoff may deliberately terminate its caller.
     // Explicit TerminateProcess targets one process; the shell's Stop All

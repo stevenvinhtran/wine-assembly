@@ -550,3 +550,38 @@ The real-WASM child-process regression fails with the old handler and passes
 with this correction, while an unknown process handle still fails. The
 browser-host spawn/terminate test also preserves exit 0xffffffff. This
 does not implement the missing cross-process DuplicateHandle alias itself.
+
+### Browser process aliases (2026-10-11)
+
+The follow-up uses target-owned `0x00E60000` handles (E4 already names child
+processes and E5 child threads), each referencing a shared process object.
+The object retains an explicit exited bit and the complete exit DWORD after
+teardown, but releases its WineAssembly reference. This avoids retaining the
+exited process's WASM memory through aliases in another live process.
+DuplicateHandle resolves source and target process handles in the caller,
+then resolves the source object in the source process's table. SAME_ACCESS,
+requested query/terminate/synchronize rights, independent close, and
+CLOSE_SOURCE are exercised. Handle IDs are monotonically allocated so a
+closed child handle does not accidentally name the next child.
+
+GetExitCodeProcess, TerminateProcess, CloseHandle, single waits and both
+multiple-wait modes recognize aliases. An exited process with code 259 is
+signaled; the numeric STILL_ACTIVE constant is not the lifetime bit. The
+existing process_ctl RPC carries the caller's stdcall-frame address for
+duplication, so output remains in caller memory while ownership is in the
+recipient. Tests exercise two separate actual WASM memories, the actual
+browser host, and an actual Node Worker using the synchronous guest RPC.
+Replacing only the DuplicateHandle handler with its original implementation
+fails the regression because the result is still the pseudo handle -1.
+
+Scope limits: this implements browser process-object aliases, not arbitrary
+cross-process file/event handles or inherited-handle transfer. The separate
+OS processes used by the CLI lack the required IPC handle table and now
+return ERROR_NOT_SUPPORTED for process duplication instead of fake success.
+The existing OpenProcess implementation retains its older access model.
+Evidence: `scratch/runs/20261011T1052Z-iw-process-aliases/`.
+Original-game latency and gameplay remain unverified on this candidate:
+`bx_qcuvw2yq:/home/user/deusex-iw-extracted-20261010` is not staged, and
+the attempted boat scp of the local original media was refused with
+`api_key_action_forbidden` (SSH action unavailable). No browser slot was
+claimed, no licence dialog answered, and no public deployment performed.

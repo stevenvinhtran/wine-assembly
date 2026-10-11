@@ -3914,6 +3914,9 @@ async function main() {
   const pipeChildByPid = new Map();
   // op 0: exit code (259 while running); op 1: terminate; op 2: validity.
   const processCtl = (op, pid, arg) => {
+    // Cross-process alias transfer needs an IPC handle table. Do not report
+    // success while copying a contextual pseudo handle into another process.
+    if (op === 3) return -50; // ERROR_NOT_SUPPORTED (browser host implements it)
     const rec = pipeChildByPid.get(pid & 0xFFFF);
     if (!rec) return -1;
     if (op === 2) return 1;

@@ -4269,6 +4269,12 @@
   ;; 26: CloseHandle(hObject) — 1 arg stdcall
   (func $handle_CloseHandle (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
     (local $console_result i32)
+    (if (i32.eq (i32.and (local.get $arg0) (i32.const 0xFFFF0000)) (i32.const 0x00E60000))
+      (then
+        (local.set $console_result (call $host_process_ctl (i32.const 7) (local.get $arg0) (i32.const 0)))
+        (call $pipe_ret (i32.eq (local.get $console_result) (i32.const 1))
+          (select (i32.const 0) (i32.const 6) (i32.eq (local.get $console_result) (i32.const 1))) (i32.const 8))
+        (return)))
     (local.set $console_result (call $toolhelp_close (local.get $arg0)))
     (if (i32.ge_s (local.get $console_result) (i32.const 0)) (then
       (call $toolhelp_return (local.get $console_result) (i32.const 1)) (return)))
@@ -6212,6 +6218,13 @@
   ;; killed itself.
   (func $handle_TerminateProcess (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
     (local $pid i32)
+    (if (i32.eq (i32.and (local.get $arg0) (i32.const 0xFFFF0000)) (i32.const 0x00E60000))
+      (then
+        (local.set $pid (call $host_process_ctl (i32.const 5) (local.get $arg0) (local.get $arg1)))
+        (call $pipe_ret (i32.eq (local.get $pid) (i32.const 1))
+          (select (i32.const 0) (i32.sub (i32.const 0) (local.get $pid))
+            (i32.eq (local.get $pid) (i32.const 1))) (i32.const 12))
+        (return)))
     (local.set $pid (call $pipe_child_pid (local.get $arg0)))
     (if (local.get $pid)
       (then
