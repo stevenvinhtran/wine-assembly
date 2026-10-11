@@ -88,7 +88,7 @@ const queryText = (offset, text, wide = false) => {
   return offset;
 };
 assert.strictEqual(host.find_window(0, 0, queryText(1024, 'mstaskswwclass'), queryText(2048, 'TASKS'), 0), 100);
-assert.strictEqual(host.find_window(0, 0, queryText(1024, 'MSTaskSwWClass', true), queryText(2048, 'Tasks', true), 1), 100);
+assert.strictEqual(host.find_window(0, 0, queryText(1024, 'MSTaskSwWClass', true), queryText(2048, 'Tasks', true), 3), 100);
 assert.strictEqual(host.find_window(0, 0, 0, 0, 0), 420, 'hidden windows remain searchable');
 assert.strictEqual(host.find_window(0x10000, 420, 0, 0, 0), 410, 'desktop alias and after follow Z order');
 assert.strictEqual(host.find_window(100, 0, 0, 0, 0), 120, 'only direct children');

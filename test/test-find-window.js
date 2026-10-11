@@ -19,6 +19,9 @@ const extraWat = String.raw`
       (local.get $hwnd) (call $g2w (local.get $title))
       (call $lstr_len (local.get $title) (i32.const 0)))
     (local.get $atom))
+  (func (export "test_find_name_atom") (param $atom i32) (param $name i32)
+    (i32.store offset=44 (call $class_record_addr (call $class_find_slot (local.get $atom)))
+      (local.get $name)))
   (func (export "test_find_window_a")
       (param $class i32) (param $title i32) (result i32)
     (i32.store offset=16 (global.get $reg_base) (i32.const 0x00300000))
@@ -45,7 +48,7 @@ const extraWat = String.raw`
 `;
 
 (async () => {
-  const { exports: e } = await bootRenderHarness({ extraWat, fonts: 'none' });
+  const { exports: e, renderer } = await bootRenderHarness({ extraWat, fonts: 'none' });
 
   const strA = value => {
     const bytes = Buffer.from(value + '\0', 'latin1');
@@ -140,6 +143,32 @@ const extraWat = String.raw`
     0, top1, mainClass, 0) >>> 0, top3,
   'FindWindowExA resumes below the reordered top-level window');
 
+  // A foreign record has no entry in this process's WND or class tables.
+  renderer.windows[0x70001] = {hwnd:0x70001, className:'IonLauncher',
+    title:'Ion Launcher', processId:9999, zOrder:100, isChild:false};
+  assert.strictEqual(e.test_find_window_a(strA('ionlauncher'), strA('ION LAUNCHER')) >>> 0,
+    0x70001, 'ANSI guest handler finds a foreign desktop window');
+  assert.strictEqual(e.test_find_window_w(strW('IonLauncher'), strW('Ion Launcher')) >>> 0,
+    0x70001, 'wide guest handler finds a foreign desktop window');
+  renderer.windows[0x70002] = {hwnd:0x70002, className:'Pane', title:'Child',
+    parentHwnd:0x70001, isChild:true, processId:9999, zOrder:101};
+  assert.strictEqual(e.test_find_window_ex_a(0x70001, 0, strA('Pane'), 0) >>> 0,
+    0x70002, 'foreign direct child is found');
+  assert.strictEqual(e.test_find_window_ex_a(0x70001, 0x70002, 0, 0), 0,
+    'foreign after does not restart traversal');
+  renderer.windows[0x70001].className = 'FableMain';
+  e.test_find_name_atom(mainAtom, mainClass);
+  assert.strictEqual(e.test_find_window_a(mainAtom, strA('Ion Launcher')) >>> 0,
+    0x70001, 'application atom resolves to its registered name across processes');
+  assert.strictEqual(e.test_find_window_w(mainAtom, strW('Ion Launcher')) >>> 0,
+    0x70001, 'wide title and ANSI registered atom name retain separate encodings');
+  renderer.windows[0x70002].className = 'Button';
+  assert.strictEqual(e.test_find_window_ex_a(0x70001, 0, 0x80, 0) >>> 0,
+    0x70002, 'USER built-in class atom resolves across processes');
+  delete renderer.windows[0x70002];
+  delete renderer.windows[0x70001];
+  assert.strictEqual(e.test_find_window_a(strA('IonLauncher'), 0), 0,
+    'destroyed foreign window cannot be rediscovered');
   console.log('PASS FindWindowA/W and FindWindowExA search live USER window trees');
 })().catch(error => {
   console.error(error && error.stack || error);

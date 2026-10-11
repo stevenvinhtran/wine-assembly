@@ -351,6 +351,24 @@ setup panels, portrait and readable done button after ordinary Enter. The
 before/after pictures were reviewed. This verifies the setup rendering fix;
 player-controlled gameplay, audio and FPS remain unqualified.
 
+## Cross-process launcher lookup (11 October)
+
+The monitor-fixed launcher trace loops in FindWindowA at caller 0x4027ba
+with a filter at guest 0x904728. The existing WAT lookup searches only its
+own WND/class tables, whereas browser processes already share renderer
+window records. A held candidate adds a desktop query before the local walk.
+It preserves direct-parent and after-window filtering, Z order, ANSI/UTF-16
+names and titles, and live destruction. Application class atoms resolve
+through the caller's registered class name; USER atoms 0x80–0x85 use their
+standard names. Unresolvable local atoms retain the existing local lookup.
+
+This is not yet an original-game success: the foreign-record regression
+uses controlled renderer records, not a pair of running guest processes.
+Worker RPC and the original launcher still need validation. CLI children
+run in separate Node processes and do not share a renderer; they additionally
+need window publication and lifetime transport. Do not equate the browser
+lookup bridge with completed CLI cross-process support.
+
 ## Ion Launcher handoff (10 October, candidate investigation)
 
 On baseline `072a9c2c3`, ordinary character setup and Start Game reaches level
