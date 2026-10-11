@@ -540,3 +540,32 @@ discard, depth or stencil effects; test stencil behavior and repeat the game
 route. Sources, 2336-byte native vertex IR, render state, diagnostic served
 backend, screenshots and cleanup are preserved in the run folder. Browser
 closed at 13:10:34Z, exit 0; the isolated browser also closed. No gameplay claim.
+
+### Colorless-pass candidate: isolated success, game still blocked
+
+Candidate `7b89c446c` is on `codex/iw-colorless-stencil-20261011`, separate
+from the held transport branch. After normal fixed-function validation it
+removes the pixel color dependency only for colorWriteMask=0 draws without
+alpha test, color key, fog, outlines or a programmed pixel shader.
+WebGL1/2 regressions preserve stencil fail/zfail/pass operations and unchanged
+color; visible draws still reject missing color. Alpha-test/key exclusion
+guards pass. The unfixed negative control fails the original link error.
+
+The original 600-second game rerun `20261011T1320Z-iw-stencil-game` nevertheless
+ends at LOADING with the same error text and writeSeq571. Its recorded backend
+hash matches the candidate. This is **not** a gameplay fix or main-ready result.
+The follow-up first-failure capture includes fog state and primitive identity
+to distinguish a different pair from a specialization exclusion.
+
+`20261011T1329Z-iw-next-shader-pair` resolves that ambiguity: the first
+failure **after** the candidate is a different program, writing position and
+tex0/tex1/tex2. Its fixed pixel stage computes texture times factor RGB but
+retains diffuse alpha. This draw has colorWriteMask=7 (RGB only), no alpha
+test/fog/stencil, and blending enabled with SRC=9 (DESTCOLOR), DST=3
+(SRCCOLOR). Thus the stencil specialization did remove the earlier failure;
+the next failure happens before another completed Present.
+
+Next investigate dead output-alpha elimination when alpha writes are masked
+and neither blend factors nor discard use source alpha. Do not substitute a
+default diffuse color globally: RGB operations or source-alpha blending can
+make that value observable. Both first-pair artifacts are retained for controls.
