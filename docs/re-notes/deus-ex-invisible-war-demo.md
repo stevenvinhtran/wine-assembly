@@ -569,3 +569,43 @@ Next investigate dead output-alpha elimination when alpha writes are masked
 and neither blend factors nor discard use source alpha. Do not substitute a
 default diffuse color globally: RGB operations or source-alpha blending can
 make that value observable. Both first-pair artifacts are retained for controls.
+
+### Level rendering restored with independent RGB-stage alpha elimination
+
+`1d5243e23` extends the separate rendering branch. It recognizes one active
+fixed stage selecting texture/factor/constant RGB independently, with alpha
+operation disabled and output alpha masked. It removes the initial diffuse
+read only when no source-alpha blend factor, alpha test, fog, outline or
+post-specular operation can make that value observable. Ordinary GLSL
+dead-code elimination alone did not remove the link dependency in WebGL.
+
+Full retained-source build and the expanded WebGL1/2 regression pass: RGB
+values, destination alpha preservation, the game's DESTCOLOR/SRCCOLOR blend,
+source-alpha exclusions, live diffuse/current RGB exclusions, and keyed
+fragment discard preserving stencil. The prior stencil-only commit fails
+the new RGB test with the original link error.
+
+Run `20261011T1345Z-iw-rgb-game` reaches the actual corridor and HUD, with no
+render queue errors in the sampled state. A stationary five-second diagnostic
+sample observed 9 published GPU frames, about 1.80 fps, on Chrome/SwiftShader;
+this is not a controlled performance benchmark. The first W input targeted
+HWND0 after launcher exit and did not visibly move the scene, so this run
+qualifies the scene only, not player control. Audio remains unverified.
+The focused-input follow-up uses an ordinary click on the new level window
+before W; shipped user.ini confirms W is MoveForwardBackward 1.000000.
+
+Run `20261011T1357Z-iw-focused-input` confirms ordinary player input: click
+the level window, hold W, dismiss the game's "Using the Datavault" help with
+Escape, then hold W for six seconds. Reviewed frames change from the corridor
+to a close-up of the nearby grating/barrier, with the HUD retained. The first
+hold also brings up the tutorial. Mouse events name HWND0x30001; key logs
+still say HWND0, so that log field alone does **not** establish a broken
+keyboard route (the game polls DirectInput). The earlier short input run was
+unqualified, not proof of a focus-routing defect.
+
+This establishes a gameplay scene and visible response to ordinary movement
+on the held combined runtime. It does not establish acceptable performance,
+audio, combat, candidate registration or production readiness. Render commits
+7b89c446c/1d5243e23 are independent review candidates; process-send cycle
+ownership remains a separate main-integration hold. Both captures ended
+cleanly and their artifacts are copied locally.
