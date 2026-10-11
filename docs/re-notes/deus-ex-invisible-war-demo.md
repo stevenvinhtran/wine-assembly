@@ -462,3 +462,29 @@ successful scalar/nested replies remain covered. Evidence:
 `scratch/runs/20261011T1216Z-process-send-failures`. Full retained-source build,
 broker tests and 26 cross-thread checks pass. Independent cyclic ownership is
 still a correctness hold, and there is no new browser gameplay result.
+
+### 600-second original route: level execution samples
+
+Run `20261011T1222Z-iw-level-samples` used the retained source plus the held
+failure-propagation candidate. It repeats the successful launcher handoff,
+then still shows LOADING at 600 seconds; browser cleanup exits zero and the
+harness reports no errors. No gameplay, ordinary movement, FPS or audio claim.
+
+Eleven 30-second-spaced samples from the spawned DX2 level process have eleven
+different main EIPs, all yield zero. The secondary thread consistently waits
+at 0x41fb2f, yield one. The earlier single sample at 0x7e15b2 does not establish
+a stuck pointer scan: original disassembly increments its array cursor, and
+the new samples reach other code. Late samples at 0x4b5309/0x4b537e and
+0x4ebcb6 surround indirect calls through the object at 0x9e1210, with slots
+0xfc/0xf4 and texture-stage-shaped arguments. Final main EIP is 0x4db80d.
+This narrows the next probe toward rendering/state submission, without proving
+that loading completed or that a frame is presented.
+
+Next: bounded API/render-call census after level launch, recording Present,
+draw submission and loading-state transitions; avoid another uninstrumented
+long wait. The sampler's additional DevTools connection used its default
+viewport, so intermediate frames show an 800px shell before the final 1000px
+capture. Treat this as diagnostic evidence, not a controlled timing benchmark.
+The missing stdole2.tlb HTTP404 remains recorded, with no demonstrated causal
+connection to the loading screen. Source hashes, samples and disassembly are
+preserved in the run folder.
