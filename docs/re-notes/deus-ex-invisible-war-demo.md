@@ -488,3 +488,34 @@ capture. Treat this as diagnostic evidence, not a controlled timing benchmark.
 The missing stdole2.tlb HTTP404 remains recorded, with no demonstrated causal
 connection to the loading screen. Source hashes, samples and disassembly are
 preserved in the run folder.
+
+### Rendering census: persistent shader-link failure behind loading image
+
+Run `20261011T1239Z-iw-render-census` on bx_p3756882 adds per-process counts
+around the existing host graphics bridge. The initial detached attempt did
+not start a browser: fork snapshots omitted node_modules and the build.
+After `npm ci` with browser download disabled and a successful full rebuild,
+the actual original-route capture started at 12:44:35Z. No guest patch or
+approval response was supplied by the capture.
+
+At 300 seconds, the spawned level process had 2284 draw and 571 Present calls.
+At 400 seconds it had 210741 draw and 994 Present calls, but 208350 draws,
+2120 clears and 423 Presents returned the bridge's error value -1. Values
+below -1 are asynchronous request tokens, not the same error category.
+The actual device queue reports:
+
+`FRAGMENT varying d3d_color0 does not match any VERTEX varying`
+
+There is one visible window, HWND 196609, owned by the level process 1002.
+Its GPU layer stays at writeSeq 571. A direct capture of that layer shows
+the loading image itself: this is not an old parent window covering a newly
+presented scene. The game continues issuing work against the failed queue.
+The harness's empty page-error array does not imply a healthy rendering queue.
+
+Three subsequent draw shader IR/source pairs were captured after failure.
+They are context, **not an identification of the first failing pair**.
+Next: capture the vertex/fragment sources and native IR at the first link
+failure, reproduce it with an isolated WebGL link test, and compare intended
+D3D shader linkage before changing missing outputs. Do not paper over the
+error by inventing a color value or clearing the failed queue. The latest
+run still does not qualify gameplay, input response, FPS or audio.
