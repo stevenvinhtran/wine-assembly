@@ -519,3 +519,24 @@ failure, reproduce it with an isolated WebGL link test, and compare intended
 D3D shader linkage before changing missing outputs. Do not paper over the
 error by inventing a color value or clearing the failed queue. The latest
 run still does not qualify gameplay, input response, FPS or audio.
+
+### First failing pair: colorless stencil pass
+
+Run `20261011T1305Z-iw-first-shader-pair` captures the actual first failed
+`createProgram` call, then rethrows the original error and closes the browser.
+The VS1.1 program writes position only. The fixed-function pixel program
+selects texture-factor RGB but retains `d3d_color0.a` as its output alpha.
+There is no vertex color output to link against.
+
+The recorded draw has `colorWriteMask=0`, alpha test disabled, stencil enabled
+(z-fail operation 4), depth testing enabled and depth writes disabled. This is
+a colorless stencil pass, not a request to display an invented diffuse color.
+An isolated WebGL test reproduces the exact link error; replacing only the
+fragment source with a constant output links successfully. That control does
+not yet verify stencil results or constitute an emulator fix.
+
+Next: specialize safe colorless fixed-function passes without removing any
+discard, depth or stencil effects; test stencil behavior and repeat the game
+route. Sources, 2336-byte native vertex IR, render state, diagnostic served
+backend, screenshots and cleanup are preserved in the run folder. Browser
+closed at 13:10:34Z, exit 0; the isolated browser also closed. No gameplay claim.
