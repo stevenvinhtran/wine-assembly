@@ -381,3 +381,25 @@ This does not serialize simultaneous mapping or implement unload. Shared
 PE_STAGING, address selection, reentrant initialization and module-graph
 lifetime still require synchronization before FreeLibraryAndExitThread can
 be implemented correctly. CMR3 gameplay remains unqualified.
+
+## 2026-10-11: mapped module identity under worker interleaving
+
+The JS loader formerly selected `get_dll_count() - 1` after `load_dll`, and
+read the count again when writing the module path. Another instance can
+publish between those operations, so a successful load can return the other
+module's address and overwrite its path. The loader now exposes its own
+last successful row as an instance-local result, reset to -1 on entry.
+JS uses that one row for both address lookup and path assignment.
+
+The real-worker regression pauses A after its actual WASM mapping, lets B
+map a distinct image and finish its path assignment, then resumes A. Both
+payloads and path row indices must match their respective images. The old
+JS loader fails this schedule; the candidate and system-path regression
+pass on the temporary box, as does the full build.
+Evidence: `scratch/runs/20261011T1100Z-dll-row-identity/`.
+
+This fixes result bookkeeping only. It does not serialize PE staging,
+address allocation, publication itself, the direct WinHelp WAT load route,
+or unload/DllMain lifetime. Those remain required before claiming the CMR3
+concurrency blocker solved. No original-game run or new screenshot came
+from this regression.

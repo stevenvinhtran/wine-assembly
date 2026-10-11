@@ -13,6 +13,10 @@
 
   ;; Load a DLL from PE_STAGING into guest memory at load_addr.
   ;; Returns DllMain entry point (guest addr), or 0 if none/error.
+  ;; This result belongs to this instance's most recent call. Shared count-1
+  ;; may already name a different worker's publication when the host resumes.
+  (global $last_loaded_dll_index (mut i32) (i32.const -1))
+  (func (export "get_last_loaded_dll_index") (result i32) (global.get $last_loaded_dll_index))
   (func $load_dll (export "load_dll") (param $size i32) (param $load_addr i32) (result i32)
     (local $pe_off i32) (local $num_sections i32) (local $opt_hdr_size i32)
     (local $section_off i32) (local $i i32) (local $vaddr i32) (local $vsize i32)
@@ -25,6 +29,7 @@
     (local $src i32) (local $dst i32) (local $header_size i32)
     (local $rsrc_rva_d i32) (local $rsrc_size_d i32) (local $rsrc_ptr i32)
     (local $image_size i32) (local $image_end i32) (local $sparse i32)
+    (global.set $last_loaded_dll_index (i32.const -1))
 
     ;; Every DLL has entries in three fixed parallel tables. Refuse the load
     ;; before mapping a section when no row remains; the former unchecked 17th
@@ -238,6 +243,7 @@
       (then (call $static_tls_attach (i32.add (local.get $load_addr) (local.get $tls_rva)))))
 
     ;; Return DllMain entry point
+    (global.set $last_loaded_dll_index (local.get $dll_idx))
     (if (result i32) (i32.ne (local.get $entry_rva) (i32.const 0))
       (then (i32.add (local.get $load_addr) (local.get $entry_rva)))
       (else (i32.const 0))))

@@ -18,17 +18,24 @@ if(!isMainThread){
    try{
     // Distinct low addresses isolate shared registry ownership from the
     // separate mapping-address and staging-buffer serialization concerns.
-    const wrapped={...e,get_next_dll_addr:()=>workerData.id==='a'?0x00400000:0x00600000,load_dll:(...args)=>{
+    let mappedCount, pathIndex;
+    const wrapped={...e,set_dll_path:(index,ptr)=>{pathIndex=index;e.set_dll_path(index,ptr);},get_next_dll_addr:()=>workerData.id==='a'?0x00400000:0x00600000,load_dll:(...args)=>{
      if (!workerData.serialized) { Atomics.add(barrier,0,1);Atomics.notify(barrier,0);
      while(Atomics.load(barrier,0)<2){
       if(Atomics.wait(barrier,0,1,10000)==='timed-out')throw Error('staging barrier timed out');
      }
-     } return e.load_dll(...args);
+     } const result=e.load_dll(...args);mappedCount=e.get_dll_count();
+     if(workerData.id==='a'){
+       parentPort.postMessage({mapped:true,id:'a'});
+       while(Atomics.load(barrier,1)!==1){if(Atomics.wait(barrier,1,0,10000)==='timed-out')throw Error('publication barrier timed out');}
+     }
+     return result;
     }};
     const mapped=loadDll(wrapped,memory.buffer,new Uint8Array(workerData.fixture),workerData.id+'.dll');
     const addr=guestToWasm(mapped.loadAddr+0x1180,e,memory.buffer,e.get_image_base());
     const actual=new DataView(memory.buffer).getUint32(addr,true);
-    parentPort.postMessage({id:workerData.id,expected:workerData.expected,actual,mapped,dllCount:e.get_dll_count(),tableFirst:new DataView(memory.buffer).getUint32(e.get_dll_table(),true),correct:actual===workerData.expected});
+    if(workerData.id==='b'){Atomics.store(barrier,1,1);Atomics.notify(barrier,1);}
+    parentPort.postMessage({id:workerData.id,expected:workerData.expected,actual,mapped,mappedCount,pathIndex,dllCount:e.get_dll_count(),tableFirst:new DataView(memory.buffer).getUint32(e.get_dll_table(),true),correct:actual===workerData.expected});
    }catch(error){parentPort.postMessage({id:workerData.id,error:String(error)});}
   });
  })().catch(error=>parentPort.postMessage({id:workerData.id,error:String(error)}));
@@ -62,7 +69,7 @@ function resourceDll(counter = 0) {
 
   const makeFixture=resourceDll;
   const module=await WebAssembly.compile(fs.readFileSync(root+'/build/wine-assembly.wasm'));
-  const memory=new WebAssembly.Memory({initial:8192,maximum:8192,shared:true}),barrier=new SharedArrayBuffer(4);
+  const memory=new WebAssembly.Memory({initial:8192,maximum:8192,shared:true}),barrier=new SharedArrayBuffer(8);
   const workers=[],results=[],ready=[];
   const completions=[];const guard=setTimeout(()=>{for(const w of workers)w.terminate();},30000);
   try{
@@ -70,12 +77,15 @@ function resourceDll(counter = 0) {
     const fixture=makeFixture();fixture.writeUInt32LE(expected,0x380);
     const w=new Worker(__filename,{workerData:{id,expected,fixture,module,memory,barrier,serialized:true}});workers.push(w);
     ready.push(new Promise(resolve=>w.on('message',m=>{if(m.ready)resolve();})));
-    completions.push(new Promise(resolve=>{w.on('message',m=>{if(!m.ready){results.push(m);resolve();}});w.on('error',error=>{results.push({id,error:String(error)});resolve();});w.on('exit',resolve);}));
+    completions.push(new Promise(resolve=>{w.on('message',m=>{if(m.mapped===true){workers[1].postMessage({go:true});return;}if(!m.ready){results.push(m);resolve();}});w.on('error',error=>{results.push({id,error:String(error)});resolve();});w.on('exit',resolve);}));
    }
-   await Promise.all(ready);workers[0].postMessage({go:true});await completions[0];workers[1].postMessage({go:true});await completions[1];
+   await Promise.all(ready);workers[0].postMessage({go:true});await Promise.all(completions);
+   results.sort((a,b)=>a.id.localeCompare(b.id));
    assert.equal(results.length,2,'both actual workers returned');
    assert.ok(results.every(r=>r.correct),'serialized mapping preserves both payloads');
-   assert.equal(results[0].dllCount,1,'first worker publishes row one');
+   assert.equal(results[0].mappedCount,1,'first worker publishes row one');
+   assert.equal(results[0].dllCount,2,'second worker publishes before first host finishes mapping bookkeeping');
+   assert.deepEqual(results.map(r=>r.pathIndex),[0,1],'each worker assigns its own module path');
    assert.equal(results[1].dllCount,2,'second worker sees published count without host replay');
    assert.equal(results[1].tableFirst,results[0].mapped.loadAddr,'second worker preserves first row');
    // A delayed host reply must not replay a captured count over shared state.
