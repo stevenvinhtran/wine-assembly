@@ -52,3 +52,28 @@ Digital Anvil / Microsoft, 2000. Direct3D 7 space combat, trial version.
 
 The menu loop is heavy at this budget (~21k API calls a batch, ~3 batches/s).
 Evidence: `scratch/runs/20261011T0630Z-starlancer-demo-d10ba697`.
+
+## 2026-10-11: released route review, not a launch-time INI diagnosis
+
+Codex recovered the released `~/slout2/r2.log`, `b0920.png` and `b1120.png`
+from boat bx_c585hr7p into
+`scratch/runs/20261011T1241Z-starlancer-handoff-review/`.
+Both reviewed frames show the **Options menu** (Save/Load, Audio, Control
+Devices, Video, Back/Main Menu/Quit), not Ships and Loadout or mission flight.
+The route's Esc inputs at batches 640/660 and its later supposed launch-arrow
+click therefore need visual revalidation; the evidence does not show which
+earlier input first diverged. The run completed 1125 batches without a trap.
+
+The traced profile-string calls name `C:\\starlancer.ini`; there is no
+`default.txt` match in this log. Integer-profile calls retain pointer arguments,
+so absence of a decoded path is not proof that every integer-profile call
+avoided it. The released INI parking patch may address a generic lazy-file
+consumer gap, but this run does not demonstrate that it fixes mission launch.
+Do not adopt its comment asserting GetPrivateProfileString reads default.txt
+as an established game diagnosis.
+
+Next runtime: visually confirm each transition through briefing and loadout,
+then capture the actual failing file consumer with bounded filesystem/host
+tracing. Preserve licence/approval boundaries; the historical script's clicks
+are evidence of what it did, not authority to replay an acceptance prompt.
+No new launch, gameplay, FPS or audio qualification accompanies this review.
