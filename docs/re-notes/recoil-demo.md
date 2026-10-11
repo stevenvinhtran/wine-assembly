@@ -145,3 +145,9 @@ At180000 batches reviewed run20261011T1934Z-recoil-level-route shows the
 Longer650000-batch run finished at19:36:14Z with no reported crash; its
 450000/520000 captures and held-Up460000..510000 require separate review.
 Browser ordinary gameplay, FPS, audio and mobile remain unverified.
+
+Player control verified in CLI run20261011T1938Z-recoil-turn-check: the
+450000-batch baseline exactly matches the forward-run before PNG; holding
+Left460000..500000 visibly rotates tank/view left and moves the obstacle to
+the right edge, with minimap orientation changing. Reviewed before/after
+gameplay captures are published. Browser/mobile/FPS/audio remain unverified.
