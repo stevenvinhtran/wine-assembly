@@ -498,3 +498,15 @@ the running apps. The regression exercises actual host process_spawn/stop:
 restoring the old cascade fails, and the candidate passes along with the
 child process-object and ShellExecuteEx tests on the boat. Original-game
 revalidation is required; these controls alone do not qualify gameplay.
+
+The paired original run `20261011T0955Z-iw-child-lifetime-original` completed
+at 10:02:54Z without browser errors. The launcher survives the parent's
+self-termination, starts DX2 with
+`-display \\.\DISPLAY1 640x480 M1_Seattle_MercDistrict_Sak.gmp?-LoadTravel`,
+then exits 0 while the new game stays alive. The final reviewed screenshot
+is the level-loading screen, **not gameplay**. This establishes that the
+lookup/lifetime chain advances the real handoff. The launcher still spends
+about 122 seconds between parent termination and the new ShellExecuteEx;
+the cause of that delay and completion of level loading remain unverified.
+No movement, gameplay FPS or audio qualification comes from this run.
+Browser ownership was released for the queued user-first BG validation.
