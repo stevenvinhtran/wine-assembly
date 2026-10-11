@@ -32,6 +32,7 @@ const extraWat = String.raw`
     ctlCalls.push([op, pid, arg]);
     const c = children.get(pid & 0xFFFF);
     if (!c) return -1;
+    if (op === 2) return 1;
     if (op === 0) return c.exitCode >>> 0;
     if (op === 1) { if (c.exitCode === 259) c.exitCode = arg >>> 0; return 1; }
     return -1;
@@ -71,6 +72,13 @@ const extraWat = String.raw`
   assert.strictEqual(tm.waitSingle(h, 0xFFFFFFFF), 0, 'a wait on an exited child is WAIT_OBJECT_0');
 
   // --- unknown child handle ---
+  children.get(0x4004).exitCode = 0xFFFFFFFF;
+  assert.strictEqual(call('t_GetExitCodeProcess', h, out), 1,
+    'exit code 0xffffffff is not an invalid-handle sentinel');
+  assert.strictEqual(e.guest_read32(out) >>> 0, 0xFFFFFFFF,
+    'the full DWORD exit code is preserved');
+  assert.strictEqual(tm.waitSingle(h, 0), 0, 'that process is still signaled');
+
   const ghost = e.t_child_handle(0x4100) >>> 0;
   assert.strictEqual(call('t_GetExitCodeProcess', ghost, out), 0, 'an unknown child handle fails');
   assert.strictEqual(e.test_last_error() >>> 0, 6, 'with ERROR_INVALID_HANDLE');

@@ -2313,10 +2313,12 @@ class WineAssembly {
       console.log(`[process_spawn] CreateProcess "${cmd}" -> ${file} at ${ipText}, pid ${pid}`);
       return pid;
     };
-    // op 0: a child's exit code (259 while it runs); op 1: terminate it.
+    // op 0: exit code; op 1: terminate; op 2: process-record validity.
+    // Validity is separate because 0xffffffff is a legitimate exit code.
     h.process_ctl = (op, pid, arg) => {
       const rec = self._children && self._children.get(pid & 0xFFFF);
       if (!rec) return -1;
+      if (op === 2) return 1;
       if (op === 0) return rec.exitCode >>> 0;
       if (op === 1) {
         if (rec.exitCode === 259) {

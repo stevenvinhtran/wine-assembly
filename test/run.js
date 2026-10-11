@@ -3912,10 +3912,11 @@ async function main() {
   // guest falls back to its old CreateProcess path.
   const pipeChildren = [];
   const pipeChildByPid = new Map();
-  // op 0: exit code (259 STILL_ACTIVE while running); op 1: terminate.
+  // op 0: exit code (259 while running); op 1: terminate; op 2: validity.
   const processCtl = (op, pid, arg) => {
     const rec = pipeChildByPid.get(pid & 0xFFFF);
     if (!rec) return -1;
+    if (op === 2) return 1;
     if (op === 0) return rec.exitCode >>> 0;
     if (op === 1) {
       if (rec.exitCode === 259) {

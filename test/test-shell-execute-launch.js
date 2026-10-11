@@ -40,9 +40,12 @@ const { createBrowserShell } = require('../lib/browser-shell.js');
   parent.stop({ repaint: false });
   assert.strictEqual(childStops, 0, 'parent exit must not terminate its child');
   assert.strictEqual(host.process_ctl(0, pid, 0), 259, 'child is still active after parent exit');
-  assert.strictEqual(host.process_ctl(1, pid, 7), 1, 'explicit child termination succeeds');
+  assert.strictEqual(host.process_ctl(2, pid, 0), 1, 'child process record is valid');
+  assert.strictEqual(host.process_ctl(1, pid, 0xFFFFFFFF), 1, 'explicit child termination succeeds');
   assert.strictEqual(childStops, 1, 'explicit termination stops exactly its target');
-  assert.strictEqual(host.process_ctl(0, pid, 0), 7, 'terminated child retains its exit code');
+  assert.strictEqual(host.process_ctl(0, pid, 0), 0xFFFFFFFF, 'terminated child retains its full exit code');
+  assert.strictEqual(host.process_ctl(2, pid, 0), 1, 'exit -1 does not invalidate the handle');
+  assert.strictEqual(host.process_ctl(2, 0x7FFC, 0), -1, 'unknown process record remains invalid');
   console.log('ok: child survives parent exit; explicit termination still works');
 }
 

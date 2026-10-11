@@ -795,7 +795,13 @@
       (then
         (local.set $arg2 (call $host_process_ctl (i32.const 0)
           (call $pipe_child_pid (local.get $arg0)) (i32.const 0)))
-        (if (i32.eq (local.get $arg2) (i32.const -1))
+        ;; Every DWORD, including 0xffffffff, is a valid process exit code.
+        ;; Ask separately whether the process record exists when the value
+        ;; collides with the host's historical missing-record sentinel.
+        (if (if (result i32) (i32.eq (local.get $arg2) (i32.const -1))
+              (then (i32.ne (call $host_process_ctl (i32.const 2)
+                (call $pipe_child_pid (local.get $arg0)) (i32.const 0)) (i32.const 1)))
+              (else (i32.const 0)))
           (then
             (global.set $last_error (i32.const 6)) ;; ERROR_INVALID_HANDLE
             (i32.store offset=0 (global.get $reg_base) (i32.const 0)))

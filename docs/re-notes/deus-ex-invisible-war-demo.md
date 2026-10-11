@@ -539,3 +539,14 @@ constant or shorten the game's timeout. Existing child PIDs are scoped to
 each parent's `_children` map, so merely copying their tagged integer into
 another process would also be incorrect. Original browser revalidation
 must verify both the shorter handoff and level completion after this fix.
+
+Another prerequisite is preserving the original process's exit code -1.
+GetExitCodeProcess previously interpreted the process_ctl return value -1
+as an invalid handle, although that is also the valid DWORD exit value
+0xffffffff. The scoped correction asks process_ctl operation 2 for record
+validity only when operation 0 returns that ambiguous value. Browser and
+CLI hosts implement the validity query; other exit codes keep one RPC.
+The real-WASM child-process regression fails with the old handler and passes
+with this correction, while an unknown process handle still fails. The
+browser-host spawn/terminate test also preserves exit 0xffffffff. This
+does not implement the missing cross-process DuplicateHandle alias itself.
