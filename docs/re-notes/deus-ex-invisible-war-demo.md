@@ -362,9 +362,12 @@ names and titles, and live destruction. Application class atoms resolve
 through the caller's registered class name; USER atoms 0x80–0x85 use their
 standard names. Unresolvable local atoms retain the existing local lookup.
 
-This is not yet an original-game success: the foreign-record regression
-uses controlled renderer records, not a pair of running guest processes.
-Worker RPC and the original launcher still need validation. CLI children
+This is not yet an original-game success. The expanded regression uses two
+WASM instances with separate memories: the owner allocates and publishes a
+window through the host, and the caller finds it and observes owner-side
+destruction. A real Node worker also queries it through the synchronous RPC
+broker and observes destruction. These are controlled harness instances,
+not two running original EXEs. The original launcher still needs validation. CLI children
 run in separate Node processes and do not share a renderer; they additionally
 need window publication and lifetime transport. Do not equate the browser
 lookup bridge with completed CLI cross-process support.

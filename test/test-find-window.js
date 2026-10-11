@@ -6,6 +6,21 @@ const assert = require('assert');
 const { bootRenderHarness } = require('./render-helper');
 
 const extraWat = String.raw`
+  (func (export "test_find_publish") (param $class i32) (param $title i32) (result i32)
+    (local $hwnd i32)
+    (local.set $hwnd (global.get $next_hwnd))
+    (global.set $next_hwnd (i32.add (local.get $hwnd) (i32.const 1)))
+    (drop (call $class_table_register (call $class_name_key (local.get $class))))
+    (call $wnd_table_set (local.get $hwnd) (global.get $WNDPROC_CTRL_NATIVE))
+    (call $wnd_set_class_slot_from_name (local.get $hwnd) (local.get $class))
+    (drop (call $host_create_window (local.get $hwnd) (i32.const 0)
+      (i32.const 0) (i32.const 0) (i32.const 100) (i32.const 100)
+      (call $g2w (local.get $title)) (i32.const 0)))
+    (call $host_set_window_class (local.get $hwnd) (call $g2w (local.get $class)))
+    (local.get $hwnd))
+  (func (export "test_find_unpublish") (param $hwnd i32)
+    (call $wnd_table_remove (local.get $hwnd))
+    (call $host_destroy_window (local.get $hwnd)))
   (func (export "test_find_setup")
       (param $hwnd i32) (param $parent i32)
       (param $class i32) (param $title i32) (result i32)
@@ -48,7 +63,7 @@ const extraWat = String.raw`
 `;
 
 (async () => {
-  const { exports: e, renderer } = await bootRenderHarness({ extraWat, fonts: 'none' });
+  const { exports: e, renderer, memory, host } = await bootRenderHarness({ extraWat, fonts: 'none' });
 
   const strA = value => {
     const bytes = Buffer.from(value + '\0', 'latin1');
@@ -169,6 +184,56 @@ const extraWat = String.raw`
   delete renderer.windows[0x70001];
   assert.strictEqual(e.test_find_window_a(strA('IonLauncher'), 0), 0,
     'destroyed foreign window cannot be rediscovered');
+  const other = await bootRenderHarness({extraWat, fonts:'none'});
+  assert.notStrictEqual(other.memory, renderer.wasmMemory, 'process instances have distinct memories');
+  other.exports.set_process_id(2000);
+  other.exports.set_hwnd_base(0x20000);
+  other.hostCtx.processId = 2000;
+  other.hostCtx.instance = other.instance;
+  other.hostCtx.wasmMemory = other.memory;
+  other.renderer.windows = renderer.windows;
+  const otherText = text => {
+    const bytes = Buffer.from(text + '\0', 'latin1');
+    const ptr = other.exports.guest_alloc(bytes.length) >>> 0;
+    bytes.forEach((b,i) => other.exports.guest_write8(ptr+i,b));
+    return ptr;
+  };
+  const liveForeign = other.exports.test_find_publish(otherText('RealForeign'), otherText('Other Process')) >>> 0;
+  assert(liveForeign, 'owner instance allocates a real HWND');
+  assert.strictEqual(renderer.windows[liveForeign].processId, 2000);
+  assert.strictEqual(e.test_find_window_a(strA('RealForeign'), strA('Other Process')) >>> 0,
+    liveForeign, 'caller finds window published from separate instance memory');
+  // Exercise the actual synchronous worker broker, with caller-memory string
+  // addresses. This is a transport test, not an original-game Worker run.
+  const RPC = require('../lib/guest-rpc');
+  const {Worker} = require('node:worker_threads');
+  const sigs = {find_window:require('../lib/host-import-sigs.generated.json').sigs.find_window};
+  const broker = RPC.createMainBroker(memory, host, sigs, {});
+  const classWA = e.get_staging() >>> 0;
+  new Uint8Array(memory.buffer).set(Buffer.from('RealForeign\0'), classWA);
+  const rpcLookup = () => new Promise((resolve, reject) => {
+    let answer;
+    const worker = new Worker(`
+      const {parentPort,workerData:d}=require('node:worker_threads');
+      const RPC=require(d.rpcPath);
+      const proxy=RPC.createWorkerImports(d.memory,d.sigs,m=>parentPort.postMessage(m),{slot:1});
+      const result=proxy.imports.host.find_window(0,0,d.classWA,0,0);
+      parentPort.postMessage({t:'answer',result});
+    `, {eval:true, workerData:{memory,sigs,classWA,rpcPath:require.resolve('../lib/guest-rpc')}});
+    const timer = setTimeout(() => {worker.terminate();reject(new Error('FindWindow worker RPC timeout'));},15000);
+    worker.on('message', m => {
+      if (m.t === 'rpc') broker.serveRpc(m.slot);
+      else if (m.t === 'calls') broker.serveCalls(m);
+      else if (m.t === 'answer') answer = m.result >>> 0;
+    });
+    worker.on('error', reject);
+    worker.on('exit', code => {clearTimeout(timer);code ? reject(new Error('worker exit '+code)) : resolve(answer);});
+  });
+  assert.strictEqual(await rpcLookup(), liveForeign, 'real worker RPC returns foreign HWND');
+  other.exports.test_find_unpublish(liveForeign);
+  assert.strictEqual(e.test_find_window_a(strA('RealForeign'), 0), 0,
+    'owner-side destruction removes foreign instance from lookup');
+  assert.strictEqual(await rpcLookup(), 0, 'worker RPC observes owner-side destruction');
   console.log('PASS FindWindowA/W and FindWindowExA search live USER window trees');
 })().catch(error => {
   console.error(error && error.stack || error);
