@@ -119,3 +119,43 @@ Then ordinary-input gameplay/browser validation, local-only registration.
 Remote bx_npc237ek retains diagnostic code; original baseline06-fpu.wat in
 /home/user/sanity-mul24/original-fpu.wat. Restore that and remove read-only
 export/TRACE-AT addition before treating later module as baseline.
+
+## 2026-10-12 08:50Z — scoped FMUL fix pushed
+
+Commit 462848051 (codex/x87-mul-pc24, off main0304) applies CW PC24
+precision reduction to scalar/register/pop and optimized x87 FMUL paths.
+It retains f64 exponent range, handles signed zero/NaN/infinity/subnormals
+and the four rounding controls during precision reduction. This remains
+f64-backed x87-lite: extended exponent range, rare double-rounding, other
+arithmetic PC handling and exact directed multiplication remain limitations.
+
+Remote build, 72 dedicated precision checks, mixed-PC differential fuzz
+(400 sequences/7178 instructions), 31 pipeline cases and comparison tests
+PASS. Evidence: scratch/runs/20261012T0846Z-sanity-mul-fix/.
+Runtime module 5e8f1716da42ea23e7d26c4389153a31f0ece9c02afc7bb9f78cc4b897bf069a
+also contains pending Z16/Winsock prerequisites; do not call it clean main.
+Read-only CW export and diagnostic trace edits were removed.
+
+Default optimizations now reach reviewed main menu (0847Z-sanity-default-fixed).
+Ordinary Enter at batch600 opens Headquarters/Temple selector
+(0849Z-sanity-single-player). Both final.png files reviewed; neither is
+player-controlled gameplay. Headquarters loading is the next bounded check.
+No fixture/table patches, public deployment or main merge.
+
+0851Z-sanity-headquarters: ordinary second Enter at batch700 opens reviewed
+difficulty menu (Brain Dead / Mentally Stable / Get Me a Straight Jacket).
+No load failure established: this is an additional menu step. Next Enter
+at batch800 selects default Mentally Stable. Commands/receipts/screenshots
+are self-contained under each scratch/runs/ directory.
+
+0853Z-sanity-difficulty: third ordinary Enter at batch800 loads Headquarters.
+Reviewed final.png shows Cain standing on the blue headquarters floor and
+a tutorial Info panel explaining mouse walking/running; no crash, bounded
+120s run ended normally at3807 batches. This is a rendered in-level tutorial,
+NOT yet verified player movement. Next dismiss text using an ordinary click
+in bottom panel, then right-button movement with before/after screenshots;
+register the original client route and validate Chrome separately.
+All named evidence collected. Remote bx_k293q9e3 retains candidate code and
+original source; no diagnostic observer exports. FMUL fix462848051 pushed
+for ops integration. Removed its clean pushed local worktree to recover70MB;
+local disk still below2GB, so all heavy work stays remote.
