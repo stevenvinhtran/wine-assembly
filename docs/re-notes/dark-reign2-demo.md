@@ -565,3 +565,24 @@ No async implementation or runtime result is claimed by this audit. Runtime
 is currently handed to launch-ux for Oni's first-level input diagnosis on
 bx_y429vzbh; the DR2 source worktree remains clean after this documentation
 commit, ready for the next tested implementation slice.
+
+### Socket creation attribute and ordinary replay (2026-10-12)
+
+WSASocketA/W now retain WSA_FLAG_OVERLAPPED in socket flags bit6 while
+allocating the real transport. Connect failure preserves it, accepted sockets
+inherit it, and destruction/reuse clears it. Creation submits no I/O; non-null
+OVERLAPPED/completion-routine operation paths still fail fast. This supersedes
+the creation gate described in the preceding audit, not its pending-I/O work.
+
+69/69 Winsock tests, 34/34 wire tests and full build pass on bx_y429vzbh;
+the new tests fail on the prior source. Tests exercise real raw echo with
+flags1, A/W allocation, slot reuse, listener inheritance and unsupported I/O.
+
+The first replay lacked test/binaries/tlbs/stdole2.tlb; restored the exact
+local fixture and reran. Ordinary DR2 then passes Trying RawSocket, enters
+Intro/Shell and loads missions/system/shell through SimInit to Sim. A bounded
+30-second run completed 1130 batches without a trap. This is the shell world,
+not a played mission; ordinary input and gameplay remain to validate.
+shell32.dll is still absent from the test checkout (logged warning).
+Evidence: scratch/runs/20261012T0045Z-dark-reign2-socket-attribute/.
+Built module SHA256: 9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6.
