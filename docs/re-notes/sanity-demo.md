@@ -58,3 +58,37 @@ comctl32 fixture warnings, but neither trapped before this observed failure.
 All five run directories retain commands, module identity, logs and captures
 under scratch/runs/20261012T08{12,13,14,15}Z-sanity-*; no result.json until a
 corpus ID exists. No registration, browser gameplay, audio or FPS claim.
+
+## Font pixel mismatch isolated, 2026-10-12 08:28Z
+
+Same module6b6d5633, remote bx_sbqrfe79 rebuilt successfully.
+0821Z-sanity-font API trace shows optional FontData.fnt open failure followed
+by hundreds of surface reads; 0823Z-sanity-surface shows slot527 populated
+(first nonzero word0xf81f). Thus missing cache is not sufficient diagnosis.
+Saved generated cshell.dll/cres.dll remotely in /home/user/sanity-vfs/windows/temp.
+cshell original base10000000 maps to runtime00b50000. Font cache reader
+10096990 returns false on absent file; glyph-boundary fallback10096b10 calls
+10096d50 to read pixels. Exact dynamic evidence0827Z-sanity-glyph-va at
+00be6c99 returns597 (full font width), with caller00be6e66 (scan exhaustion).
+0828Z-sanity-pixel at00be6db7 captures object01a1b4fc: font14PIXELANTI,
+width597 height14, expected background00ff00ff. Pixel at(3,0) returns00fe00fe
+in output074ff554. At(7,0), pixel0. No guest memory patches were used.
+
+client.dll GetPixel0040c920 decodes565 into a5-bit expansion lookup at0049836c.
+0829Z/0830Z dumps confirm lookup[31]=254, not255. Constructor0040cc70 executes
+FILD i64(index); FMUL f32[0048b7cc]=255; FMUL f32[0048b7e4]=0.032258063554763794;
+_ftol00478a64. Numerical comparison with original constants: f64 gives
+254.9999924004078 -> trunc254; staged f32 gives255. Current06-fpu.wat explicitly
+ignores x87 precision-control. This is a strong precision lead, NOT yet a
+validated emulator fix: establish guest CW during table creation and compare
+matching native x87 before changing arithmetic (including optimized paths).
+Do not patch the font bitmap/table or supply fabricated FontData.fnt.
+
+Diagnostic limits:0824Z breakpoint did not fire;0825Z/0826Z module-relative
+probes supplied RVAs where resolver expects original VA, so those negative
+results prove nothing. Absolute return-site probes0827Z/0828Z worked.
+0829Z inside optimized _ftol did not fire;0830Z return-site probe hit8 of32
+iterations, so its overwritten stack is NOT a trustworthy CW observation.
+Numerical JSON, relevant client disassembly and pixel receipts are named
+artifacts in0828Z-sanity-pixel. All captures remain investigation-only until
+a corpus registration exists. No new gameplay, audio or FPS claim.
