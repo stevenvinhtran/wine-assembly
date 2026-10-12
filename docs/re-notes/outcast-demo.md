@@ -22,3 +22,68 @@ bx_f7mupqaw. No game payload downloaded or runtime launched yet. Next recover
 the named executable/asset tree on a temporary box, record per-file hashes,
 read guidance/imports and attempt a bounded launcher route. No source edit,
 gameplay/audio/FPS/registration/public-distribution qualification claimed.
+
+
+## Recovered payload and launcher, 2026-10-12 04:45Z
+
+Recovered all 141 selected files (141,828,299 bytes): EXE/PAK/README plus
+INFO.TXT and SETUP.INI. Evidence scratch/runs/20261012T0439Z-outcast-recovery
+contains the complete per-file SHA256 receipt, range download scripts, static
+launcher imports, configuration and build log. The ISO itself was not downloaded
+or whole-disc hashed. Node fetch stalled on larger ranges; its two interrupted
+attempts are retained. Curl with checked HTTP206 and exact range lengths completed.
+Payload is on bx_64vb5qy9 under /home/user/outcast-demo-preflight/independent.
+
+INFO.TXT describes a 20-minute Shamazaar demo: arrow-key movement, mouse look,
+left click use/jump/fire, right click aim/punch, 1 draws weapon, 0 holsters,
+Tab map, B inventory. README.TXT dates it 290699. LOADER.INI initially selects
+400x300 and includes volume=0.000000; audio has not been evaluated.
+
+For launch, hardlinked the EXE and PAK directory contents into a flat game/
+folder, preserving original recovered files and their bytes. The runtime reads
+text.pak, menu bitmaps and configuration successfully from this layout. LOADER.EXE
+SHA256 b06271739720cf695cb13db4d0bbb864c7f8a69429380fe307912edc66631e56.
+Module SHA256 9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6
+matches the prior temporary-box build; this is not a claim of testing clean main.
+
+0444Z-outcast-launcher: bounded CLI with all files mounted, spawn-processes,
+100000 batch size, 40-second limit, exit0 at1013batches. Reviewed final.png shows
+German New Game/Load Game/Settings/Quit menu. A missing real shell32.dll warning
+is retained in run.log; no ordinal trap occurred. First wrapper attempt had a
+JavaScript syntax error before guest launch; transport.log preserves that and
+transport-retry.log the corrected run. Menu is verified; gameplay is not yet.
+
+
+0446Z-outcast-newgame scheduled its click at1020, but the80-second guard
+stopped at1016: input never fired, so this does not test New Game. The launcher
+idle loop makes large batches extremely slow. In0448Z-outcast-newgame-early,
+ordinary click200,185 at1010 succeeds: writes selected settings then invokes
+ShellExecuteA("C:/oc2.exe", "game", cwd C:/). Launcher exits0, followed by an
+EIP-zero teardown diagnostic; do not mislabel that as the game executable crash.
+
+The CLI ShellExecute hook needs --capture-launch for this route; --spawn-processes
+alone does not follow it.0449Z-outcast-child captures the complete modified VFS
+at that handoff, then launches the metadata-selected executable with --vfs-tree,
+--cwd and --args=game. 4000batches/25.67seconds, exit0,20.8million MMX instructions.
+Reviewed child.png shows Cutter and an NPC on a dock in the rendered3D world,
+HUD/health/compass visible. No emulator source patch. This establishes world
+rendering; ordinary input displacement still requires its separate test.
+Captured files live remotely under /home/user/outcast-demo-preflight/captured;
+use those for replay, since the launcher modified the settings before handing off.
+Missing real shell32.dll/ole32.dll warnings remain; no ordinal trap observed.
+
+
+## Ordinary movement verified, 04:52Z
+
+0450Z-outcast-movement: captured-child replay, before.png at4000, ordinary
+VK38 down4100/up6100, final7000. Reviewed before/after shows forward displacement:
+bridge pillars move outward and the nearby NPC is passed on the right. Movement
+is modest; do not claim long-distance exploration. Matching0451Z-outcast-noinput-control
+runs to7000 without keys and retains the original dock/camera position. Both
+exit0 (~41seconds); module matches above, OC2 SHA256 d5513a94c2aff8ed54598c60fbf28bdf5845848a5eef74ff326037ec1a54f8a1.
+The input/control difference establishes player-controlled forward movement.
+
+No emulator source fix. Next local-only registration with reproducible launcher
+configuration/handoff, browser arrow-key and touch movement, scene-qualified FPS
+and audio. Do not use batches/s as FPS. No browser/phone/audio qualification yet.
+Original menu/child warnings and failed harness attempts remain in evidence.
