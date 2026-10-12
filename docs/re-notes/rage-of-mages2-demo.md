@@ -68,3 +68,29 @@ explicit. Browser, touch, audio and qualified FPS remain unverified.
 Next local-only candidate/app registration using the recovered GameStar
 layout, then browser/direct-touch route. Runtime boat stopped with fixtures
 retained in its snapshot; main integration remains ops-owned.
+
+## Registered Chromium direct-touch gameplay (2026-10-12 04:31 UTC)
+
+Local-only registration `77f25049f` on codex/dr2-registration adds candidate
+`rage-of-mages2-demo`, app `rage_of_mages2_demo`, both companion DLLs and
+direct-touch strategy controls (Esc/keyboard). Production DESKTOP_APPS stays
+unchanged. Preparation uses the17 recovered files in `game/`; manual source
+instructions pin the disc metadata hash and verified EXE hash. Prepare/build/
+registry-local-only/path checks pass. No fresh automated full-disc fetch claim.
+
+0427Z-rage2-browser: Chrome155, same module9e835f75..8cd6, worker threads.
+Actual touch taps open New Game at(268,323), clear dialogue at(336,550),
+select at(124,305) then order(185,380). Reviewed step3/4 show the selected
+character move from about(124,305) to(190,365), revealing more map, with fixed
+terrain landmarks. This establishes registered browser touch gameplay.
+At844x390, the full game and Esc/keyboard affordances remain visible; touch
+(340,185) opens a new in-world NPC conversation. That last dialogue obscures
+the character, so it proves touch interaction, not a separate measured
+displacement at the narrow viewport. Desktop Chromium touch emulation is not
+Safari or physical-device validation. Audio, qualified FPS and broader
+combat/save/load remain unverified.
+
+Exact probe/command1..6, screenshots, logs, environment and stage preserved.
+Stage complete04:31:02; browser/server closed despite outer transport141.
+No guest crash inferred from that transport status. Core task moves to ops
+review; Outcast demo refills the new-game lane alongside Dark Reign2.
