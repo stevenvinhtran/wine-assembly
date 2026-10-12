@@ -30,3 +30,31 @@ prepare local game layout, bounded original launch, then registration/input.
 Boat API transport failed while resume kept running; checked actual process
 and receipts, never launched concurrent writers. All transfers named evidence
 files only; no source assets copied onto disk-constrained coordinator.
+
+## First launch and exact blocker 2026-10-12 08:15Z
+
+Remote bx_kd2gte5j rebuilt main0304+Z16+existing pending Winsock; build PASS,
+module SHA256 6b6d56337acd65b64de5c2192efed64df64562f3865e602ccbb809a44be18ab1.
+Game tree mounted at C:\, Data/SANITY.REZ at C:\SANITY.REZ, cwd C:\LITHTECH.
+0812Z-sanity-first reviewed launcher; 0813Z-sanity-launch reviewed detail chooser.
+Ordinary clicks (305,47), then Medium (212,256), produce ShellExecute file
+CLIENT.DLL with -windowtitle Sanity -rez ..\sanity.rez -rez ..\sounds.rez
+-rez ..\talents.rez -rez ..\custom -rez ..\sanityl.rez ++globaldetail 1
+++Lightmap 1 ++GroupOffset0 1. Parent then exits with EIP0; child not launched
+by this CLI route. client.dll is an executable PE (characteristics0x10f,
+entryRVA0x7af4f), so direct launch with the observed arguments is legitimate.
+0814Z-sanity-client loads cshell/cres from REZ, d3d.ren, Miles and input, then
+reports 'Could not create the Interface Manager object'. No gameplay.
+0815Z-sanity-files bounds tracing to80batches: last CreateFileA FontData.fnt
+returns INVALID_HANDLE immediately before that error. Original extracted tree
+contains no loose font file. Labeled follow-up corrects an ambiguous combined
+strings output: SETUP.INS has NO FontData string; SANITY.REZ contains it at
+offset1494536 among embedded font-manager code. A failed optional file open
+is not proof of the error cause. Next trace font initialization and its first
+failing return (font metrics/surfaces/file fallback), without assuming a
+missing installer-generated file.
+Do not invent font bytes or patch around failure. Also missing system shell32/
+comctl32 fixture warnings, but neither trapped before this observed failure.
+All five run directories retain commands, module identity, logs and captures
+under scratch/runs/20261012T08{12,13,14,15}Z-sanity-*; no result.json until a
+corpus ID exists. No registration, browser gameplay, audio or FPS claim.
