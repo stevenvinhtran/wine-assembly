@@ -927,3 +927,26 @@ and mouse-command handling, comparing ordinary targets via runtime/API
 evidence. Selection ownership and general simulation are functioning; do
 not repeat queue/pause/difficulty/wait/Scatter/FMUL controls. All artifacts
 collected from sole boat bx_224cjc5g, main0304 unchanged, ops integration.
+
+### Ground-target browser movement verified after settling pointer (11:19Z)
+
+1113Z-dr2-target-settlement changes only the motion-to-down gap: wait2000ms
+after p.mouse.move(120,393), retain500ms down/up and60s observation. Exact
+6b6d5633 module, original Normal/selection route. Reviewed selected versus
+after60 shows units grouped at target, displaced from original formation.
+Input audit actual motion205834.750ms/down207888.855ms:2054.105ms gap.
+The failed1002Z control was1.35ms. CLI success also separates relmousemove
+2100 from down2110 at200ms/batch (2guest seconds). Simulation1513->2117,
+guest tick207983->268431. No emulator source change required for this route.
+
+CORRECTION: green flag is already present in target-settled.png BEFORE down;
+earlier references to an order marker did not prove acceptance. It is hover
+indication here. Do not infer raycast failure from the earlier captures.
+Evidence supports an input-ordering dependency, not its exact root cause or
+a blanket production fix. Next test real touch targeting and shorter/rapid
+move-click ordering; preserve working settled-pointer route for coverage.
+Audio/FPS/device qualification remains separate.
+
+Local wrapper returned null status/empty stdout early; remote stage stayed
+mission-loading and ultimately complete. Collected actual remote evidence,
+no duplicate run. Build/prepare/Chrome and evidence checks pass.
