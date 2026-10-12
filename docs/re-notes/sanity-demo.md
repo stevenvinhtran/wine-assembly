@@ -192,3 +192,26 @@ No public deployment; source/extracted payload lives only on remote snapshot
 bx_ahkvwes2. Local test/candidate-corpus/sanity-demo/game/ not prepared.
 Dark Reign2 next remains semantic command/selection ownership or matched
 CLI observation interval; no repeated queue/pause/difficulty controls.
+
+## 2026-10-12 09:23Z — registered browser gameplay
+
+Registration c0fd4c80a pushed on codex/dr2-registration: candidate sanity-demo,
+app sanity_demo, local-only original client route; touch Move/Action/Confirm
+controls supplied but not validated. Depends on FMUL462848051.
+Prepared29 companion files at remote test/binaries/candidates/sanity-demo/
+with Game layout and root SANITY.REZ.0915Z build PASS, prepare-fixed PASS.
+Initial local-demo-installers destination mistake corrected before browser.
+Fork bx_g2kr5b2c omitted Chrome;0916Z browser did not start. Restored
+Puppeteer Chrome155.0.8059.39, new0918Z evidence folder preserves successful
+registered /emulator/?debug&app=sanity_demo test.
+
+Reviewed main menu, level selector, difficulty, opening sequence and tutorial.
+Click235,535 dismisses text panel; before-move shows Cain near platform
+center. Right mouse at330,420 held3500ms moves him toward edge in moved.png.
+Chrome155/WebGL/worker mode,800x600, module5e8f1716...69a. No guest writes.
+result.json published after named artifacts; evidence check has zero errors,
+missing or invalid records for this run. Audio/FPS/touch/real-device unverified.
+No public deployment; main0304 unchanged, ops owns integration.
+Local test/binaries/candidates/sanity-demo/game/ remains absent intentionally
+on disk-constrained coordinator; full verified prepared fixture preserved
+on remote bx_g2kr5b2c snapshot.
