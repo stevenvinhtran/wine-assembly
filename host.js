@@ -648,6 +648,7 @@ class WineAssembly {
   // other provider (a dropped File, a mounted ISO) keeps the VFS contract: a
   // failed fill becomes ERROR_READ_FAULT for the guest.
   async _fillParkedRead(vfs, pending) {
+    this.logToUI(`[_fillParkedRead] ${pending && pending.path} off=${pending && pending.offset} len=${pending && pending.length}`);
     const cache = pending && pending.provider;
     const GW = typeof window !== 'undefined' && window.GameWait;
     if (!cache || !cache.gameData || typeof cache.fill !== 'function') {
@@ -1007,6 +1008,10 @@ class WineAssembly {
     }
     if (direct.status !== 404) {
       throw new Error(`Unable to load ${url}: HTTP ${direct.status}`);
+    }
+
+    if (/\.(dll|exe|ico|json|txt|ini|cfg)$/i.test(url)) {
+      throw new Error(`Unable to load ${url}: HTTP 404`);
     }
 
     // A split asset's whole size is not known until its last part arrives.
@@ -2086,7 +2091,7 @@ class WineAssembly {
           if (resolved && resolved.name) apiName = resolved.name;
           pendingTraceComApiId = -1;
         }
-        if (traceApiNames.has(apiName)) {
+        if ((traceApiNames && traceApiNames.has(apiName)) || (typeof window !== 'undefined' && window.__waTraceAllApis)) {
           lastTraceApi = true;
           let suffix = '';
           const ex = self.instance && self.instance.exports;
@@ -2131,6 +2136,7 @@ class WineAssembly {
             }
           }
           console.log(`[API] ${apiName}${suffix}`);
+          self.logToUI(`[API] ${apiName}${suffix}`);
         }
       }
       if (self.verbose) {
@@ -2138,16 +2144,59 @@ class WineAssembly {
         self.logToUI('[wine-asm] ' + text);
       }
     };
+    let pendingSehMarker = 0;
+    let pendingSehArgs = [];
     h.log_i32 = (val) => {
-      if (((val >>> 0) >>> 16) === 0xC0DE) {
-        pendingTraceComApiId = (val >>> 0) & 0xFFFF;
+      const u = val >>> 0;
+      if ((u >>> 16) === 0xC0DE) {
+        pendingTraceComApiId = u & 0xFFFF;
         lastTraceApi = false;
         return;
       }
-      if (lastTraceApi) console.log(`  => 0x${(val >>> 0).toString(16)}`);
+      if (u === 0xCAE8C000 || u === 0xCAE8C0DE || u === 0xCAE8C0FF) {
+        pendingSehMarker = u;
+        pendingSehArgs = [];
+        console.log(`[SEH] marker: 0x${u.toString(16)}`);
+        self.logToUI(`[SEH] marker: 0x${u.toString(16)}`);
+        return;
+      }
+      if (pendingSehMarker === 0xCAE8C000) {
+        pendingSehArgs.push(u);
+        if (pendingSehArgs.length === 2) {
+          const [code, eip] = pendingSehArgs;
+          const ex = self.instance && self.instance.exports;
+          const faultAddr = ex && ex.get_fault_address ? (ex.get_fault_address() >>> 0) : 0;
+          const esp = ex && ex.get_esp ? (ex.get_esp() >>> 0) : 0;
+          const msg = `[SEH] fault: code=0x${code.toString(16)} eip=0x${eip.toString(16)} fault_addr=0x${faultAddr.toString(16)} esp=0x${esp.toString(16)}`;
+          self._lastFault = { code, eip, faultAddr, esp };
+          console.log(msg);
+          self.logToUI(msg);
+          pendingSehMarker = 0;
+        }
+        return;
+      }
+      if (pendingSehMarker === 0xCAE8C0DE) {
+        const msg = `[SEH] unhandled terminate: code=0x${u.toString(16)}`;
+        console.log(msg);
+        self.logToUI(msg);
+        pendingSehMarker = 0;
+        return;
+      }
+      if (pendingSehMarker === 0xCAE8C0FF) {
+        pendingSehArgs.push(u);
+        if (pendingSehArgs.length === 3) {
+          const [code, eip, repeats] = pendingSehArgs;
+          const msg = `[SEH] storm: code=0x${code.toString(16)} eip=0x${eip.toString(16)} repeats=${repeats}`;
+          console.log(msg);
+          self.logToUI(msg);
+          pendingSehMarker = 0;
+        }
+        return;
+      }
+      if (lastTraceApi) console.log(`  => 0x${u.toString(16)}`);
       if (self.verbose) {
-        console.log('[wine-asm] i32:', '0x' + (val >>> 0).toString(16));
-        self.logToUI('[wine-asm] i32: 0x' + (val >>> 0).toString(16));
+        console.log('[wine-asm] i32:', '0x' + u.toString(16));
+        self.logToUI('[wine-asm] i32: 0x' + u.toString(16));
       }
     };
     h.log_eip = (eip) => {
@@ -2410,11 +2459,23 @@ class WineAssembly {
       return 1;
     };
     h.exit = (code) => {
-      console.log('[ExitProcess] code:', code);
+      const e = self.instance && self.instance.exports;
+      let prevEip = e && e.get_dbg_prev_eip ? '0x' + (e.get_dbg_prev_eip() >>> 0).toString(16) : '?';
+      let prev2Eip = e && e.get_dbg_prev2_eip ? '0x' + (e.get_dbg_prev2_eip() >>> 0).toString(16) : '?';
+      let faultAddr = e && e.get_fault_address ? '0x' + (e.get_fault_address() >>> 0).toString(16) : '?';
+      let esp = e && e.get_esp ? (e.get_esp() >>> 0) : 0;
+      let stackDump = [];
+      if (e && e.guest_read32 && esp) {
+        for (let i = 0; i < 8; i++) {
+          stackDump.push('0x' + (e.guest_read32(esp + i * 4) >>> 0).toString(16));
+        }
+      }
+      let faultStr = self._lastFault ? ` last_fault=[code=0x${self._lastFault.code.toString(16)} eip=0x${self._lastFault.eip.toString(16)} fault_addr=0x${self._lastFault.faultAddr.toString(16)}]` : '';
+      console.log('[ExitProcess] code:', code, 'prev_eip:', prevEip, 'prev2_eip:', prev2Eip, 'fault_addr:', faultAddr, 'esp:', '0x' + esp.toString(16), 'stack:', stackDump.join(' ') + faultStr);
       // A parent's GetExitCodeProcess on this process reads it (process_spawn).
       self._exitCode = code >>> 0;
       if (!self._inDllInit) {
-        self.logToUI('[ExitProcess] code: ' + code);
+        self.logToUI('[ExitProcess] code: ' + code + ' prev_eip=' + prevEip + ' prev2=' + prev2Eip + ' fault_addr=' + faultAddr + ' esp=0x' + esp.toString(16) + ' stack=[' + stackDump.join(' ') + ']' + faultStr);
         self.logToUI('--- Program exited ---');
         self.stop();
       }
@@ -3981,8 +4042,8 @@ class WineAssembly {
                 checkCancelled();
                 // One cache shape for every streamed file: 1MB chunks, and
                 // read-ahead/prefetch only while reads are sequential
-                // (lib/byte-provider.js ChunkCache), bounded per file.
-                const cache = window.byteProvider.cached(provider);
+                // (lib/byte-provider.js ChunkCache), bounded per file (4GB cache to prevent eviction).
+                const cache = window.byteProvider.cached(provider, { maxChunks: 4096 });
                 if (item.loadMode === 'background') {
                   if (!this._backgroundAssetJobs) this._backgroundAssetJobs = [];
                   if (this._backgroundAssetJobs.length < 8) this._backgroundAssetJobs.push({url, cache});
@@ -4293,18 +4354,32 @@ class WineAssembly {
     if (this._loadedDllBytesByName && this._loadedDllBytesByName[fileName]) {
       return this._loadedDllBytesByName[fileName];
     }
+    if (this._missingDlls && this._missingDlls.has(fileName)) {
+      return null;
+    }
+    if (fileName === 'usp10.dll') {
+      this._missingDlls = this._missingDlls || new Set();
+      this._missingDlls.add(fileName);
+      return null;
+    }
+    const regPath = typeof window !== 'undefined' && window.dllRegistry && window.dllRegistry.dllPath ? window.dllRegistry.dllPath(fileName) : null;
     const dir = exeDir && this._exeUrl ? this._exeUrl.replace(/[^\/\\]*$/, '') : '';
-    const paths = [
-      dir ? dir + fileName : '',
-      `binaries/dlls/${fileName}`,
-      `binaries/plugins/${fileName}`,
-      `dlls/${fileName}`,
-    ].filter(Boolean);
+    const paths = regPath
+      ? [regPath]
+      : [
+          dir ? dir + fileName : '',
+          `binaries/dlls/${fileName}`,
+          `binaries/plugins/${fileName}`,
+          `dlls/${fileName}`,
+        ].filter(Boolean);
     for (const p of paths) {
       try {
-        return await WineAssembly.fetchAssetBytes(p);
+        const bytes = await WineAssembly.fetchAssetBytes(p);
+        if (bytes) return bytes;
       } catch (_) {}
     }
+    this._missingDlls = this._missingDlls || new Set();
+    this._missingDlls.add(fileName);
     return null;
   }
 
@@ -6381,7 +6456,7 @@ class WineAssembly {
     // A frozen guest already costs nothing when nobody is stepping it, and a
     // hidden-tab pause would swallow the continuation an agent's next `step`
     // needs. The dashboard's tiles are often not the visible tab.
-    if (this._frozen) return false;
+    if (this._frozen || (typeof window !== 'undefined' && (window.__waNeverPauseHidden || window.agentRemoteSessionId))) return false;
     if (this._hiddenPaused || !this.running) return false;
     if (typeof document === 'undefined' || !document.hidden) return false;
     if (this._isAudioHot()) return false;
@@ -6791,6 +6866,18 @@ class WineAssembly {
           // the shared thread-manager block immediately below. Returning first
           // lets the main thread retry and re-park forever without ever giving
           // the critical-section owner a slice.
+          const waitAddr = self.instance.exports.get_cs_wait_addr ? self.instance.exports.get_cs_wait_addr() : 0;
+          const waitOwner = self.instance.exports.get_cs_wait_owner ? self.instance.exports.get_cs_wait_owner() : 0;
+          const ownerThread = (waitOwner > 1 && self.threadManager) ? self.threadManager._resolveCurrentThread(waitOwner) : null;
+          const ownerAlive = waitOwner === 1 || (ownerThread && ownerThread.state !== 'exited');
+          if (waitAddr && (!ownerAlive || !self.threadManager || !self.threadManager.hasActiveThreads())) {
+            // Abandoned critical section: owning thread exited or no active threads can release it. Break the lock.
+            const u32 = new Uint32Array(self.instance.exports.memory.buffer);
+            const idx = waitAddr >> 2;
+            u32[idx + 1] = 0xFFFFFFFF; // LockCount = -1
+            u32[idx + 2] = 0;          // RecursionCount = 0
+            u32[idx + 3] = 0;          // OwningThread = 0
+          }
           self.instance.exports.clear_yield();
         }
         // Spawn and run worker threads

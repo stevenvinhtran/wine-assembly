@@ -69,7 +69,7 @@ async function main() {
   tm._log = () => {};
   const stackSize = 0x10000;
   new Uint8Array(memory.buffer, sparseWasmBase, stackSize + 0x200).fill(0xaa);
-  const handle = tm.createThread(0x00401000, 0x12345678, stackSize, 0);
+  const handle = tm.createThread(0x00401000, 0x12345678, stackSize, 0x10000);
 
   await tm.spawnPending();
 
