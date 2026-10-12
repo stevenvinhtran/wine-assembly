@@ -2125,6 +2125,31 @@
     (if (local.get $arg3) (then (call $gs32 (local.get $arg3) (local.get $r))))
     (i32.store offset=0 (global.get $reg_base) (i32.const 0)))
 
+    ;; WSARecv(s, lpBuffers, dwBufferCount, lpNumberOfBytesRecvd, lpFlags, lpOverlapped, lpCompletionRoutine) - 7 args (28 bytes)
+  (func $handle_WSARecv (param $arg0 i32) (param $arg1 i32) (param $arg2 i32)
+                        (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $buf i32) (local $len i32) (local $r i32)
+    ;; Pop all 7 arguments (28 bytes) off the guest stack
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 32)))
+    (if (i32.or (i32.eqz (local.get $arg1)) (i32.eqz (local.get $arg2)))
+      (then
+        (call $vsock_set_error (i32.const 10014)) ;; WSAEFAULT
+        (i32.store offset=0 (global.get $reg_base) (i32.const -1))
+        (return)))
+    ;; Read first buffer (len at +0, buf pointer at +4)
+    (local.set $len (call $gl32 (local.get $arg1)))
+    (local.set $buf (call $gl32 (i32.add (local.get $arg1) (i32.const 4))))
+    (local.set $r (call $vsock_recvfrom_core (local.get $arg0) (local.get $buf) (local.get $len)
+      (i32.const 0) (i32.const 0) (i32.const 28)))
+    (if (i32.ge_s (local.get $r) (i32.const 0))
+      (then
+        (if (local.get $arg3) (then (call $gs32 (local.get $arg3) (local.get $r))))
+        (if (local.get $arg4) (then (call $gs32 (local.get $arg4) (i32.const 0))))
+        (i32.store offset=0 (global.get $reg_base) (i32.const 0))) ;; return 0 (success)
+      (else
+        (i32.store offset=0 (global.get $reg_base) (i32.const -1)))) ;; return SOCKET_ERROR
+  )
+
   ;; WSARecvFrom(s, lpBuffers, dwBufferCount, lpNumberOfBytesRecvd, lpFlags,
   ;; lpFrom, lpFromlen, lpOverlapped, lpCompletionRoutine).
   (func $handle_WSARecvFrom (param $arg0 i32) (param $arg1 i32) (param $arg2 i32)

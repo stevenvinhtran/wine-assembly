@@ -3228,6 +3228,143 @@
     (i32.store offset=0 (global.get $reg_base) (i32.const 0x80004001))
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 12))))
 
+  (global $dxdiag_provider_obj (mut i32) (i32.const 0))
+  (global $dxdiag_container_obj (mut i32) (i32.const 0))
+
+  ;; Mock IDxDiagProvider and IDxDiagContainer objects for DxDiag system diagnostics.
+  ;; Allocates a mock object + vtable + x86 thunk routine on heap.
+  (func $dxdiag_mock_init (result i32)
+    (local $base i32)
+    (local $pProvider i32)
+    (local $pContainer i32)
+    (local $vtbl_provider i32)
+    (local $vtbl_container i32)
+    (local $thunk_qi i32)
+    (local $thunk_addref i32)
+    (local $thunk_init i32)
+    (local $thunk_root i32)
+    (local $thunk_child i32)
+    (local $thunk_enum_child i32)
+    (local $thunk_ret_count0 i32)
+    (local $thunk_enum_props i32)
+    (local $thunk_get_prop i32)
+
+    (if (global.get $dxdiag_provider_obj)
+      (then (return (global.get $dxdiag_provider_obj))))
+
+    (local.set $base (call $heap_alloc (i32.const 256)))
+    (if (i32.eqz (local.get $base))
+      (then (return (i32.const 0))))
+
+    (local.set $pProvider (local.get $base))
+    (local.set $pContainer (i32.add (local.get $base) (i32.const 4)))
+    (local.set $vtbl_provider (i32.add (local.get $base) (i32.const 8)))
+    (local.set $vtbl_container (i32.add (local.get $base) (i32.const 32)))
+
+    (local.set $thunk_qi (i32.add (local.get $base) (i32.const 72)))
+    (local.set $thunk_addref (i32.add (local.get $base) (i32.const 88)))
+    (local.set $thunk_init (i32.add (local.get $base) (i32.const 96)))
+    (local.set $thunk_root (i32.add (local.get $base) (i32.const 104)))
+    (local.set $thunk_child (i32.add (local.get $base) (i32.const 120)))
+    (local.set $thunk_enum_child (i32.add (local.get $base) (i32.const 136)))
+    (local.set $thunk_ret_count0 (i32.add (local.get $base) (i32.const 152)))
+    (local.set $thunk_enum_props (i32.add (local.get $base) (i32.const 172)))
+    (local.set $thunk_get_prop (i32.add (local.get $base) (i32.const 180)))
+
+    ;; Object headers: *this = vtbl
+    (call $gs32 (local.get $pProvider) (local.get $vtbl_provider))
+    (call $gs32 (local.get $pContainer) (local.get $vtbl_container))
+
+    ;; IDxDiagProvider vtable (5 slots)
+    (call $gs32 (local.get $vtbl_provider) (local.get $thunk_qi))
+    (call $gs32 (i32.add (local.get $vtbl_provider) (i32.const 4)) (local.get $thunk_addref))
+    (call $gs32 (i32.add (local.get $vtbl_provider) (i32.const 8)) (local.get $thunk_addref))
+    (call $gs32 (i32.add (local.get $vtbl_provider) (i32.const 12)) (local.get $thunk_init))
+    (call $gs32 (i32.add (local.get $vtbl_provider) (i32.const 16)) (local.get $thunk_root))
+
+    ;; IDxDiagContainer vtable (9 slots)
+    (call $gs32 (local.get $vtbl_container) (local.get $thunk_qi))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 4)) (local.get $thunk_addref))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 8)) (local.get $thunk_addref))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 12)) (local.get $thunk_ret_count0))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 16)) (local.get $thunk_enum_child))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 20)) (local.get $thunk_child))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 24)) (local.get $thunk_ret_count0))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 28)) (local.get $thunk_enum_props))
+    (call $gs32 (i32.add (local.get $vtbl_container) (i32.const 32)) (local.get $thunk_get_prop))
+
+    ;; Thunk 1: QI: mov eax, [esp+4]; mov ecx, [esp+12]; mov [ecx], eax; xor eax, eax; ret 12; nop
+    ;; Bytes: 8B 44 24 04  8B 4C 24 0C  89 01 31 C0  C2 0C 00 90
+    (call $gs32 (local.get $thunk_qi) (i32.const 0x0424448B))
+    (call $gs32 (i32.add (local.get $thunk_qi) (i32.const 4)) (i32.const 0x0C244C8B))
+    (call $gs32 (i32.add (local.get $thunk_qi) (i32.const 8)) (i32.const 0xC0310189))
+    (call $gs32 (i32.add (local.get $thunk_qi) (i32.const 12)) (i32.const 0x90000CC2))
+
+    ;; Thunk 2: AddRef/Release: mov eax, 1; ret 4
+    ;; Bytes: B8 01 00 00 00  C2 04 00
+    (call $gs32 (local.get $thunk_addref) (i32.const 0x000001B8))
+    (call $gs32 (i32.add (local.get $thunk_addref) (i32.const 4)) (i32.const 0x0004C200))
+
+    ;; Thunk 3: Initialize: xor eax, eax; ret 8; nop nop nop
+    ;; Bytes: 31 C0  C2 08 00  90 90 90
+    (call $gs32 (local.get $thunk_init) (i32.const 0x08C2C031))
+    (call $gs32 (i32.add (local.get $thunk_init) (i32.const 4)) (i32.const 0x90909000))
+
+    ;; Thunk 4: GetRootContainer: mov ecx, [esp+8]; mov edx, pContainer; mov [ecx], edx; xor eax, eax; ret 8
+    ;; Bytes: 8B 4C 24 08  BA <pContainer:4>  89 11 31 C0  C2 08 00
+    (call $gs32 (local.get $thunk_root) (i32.const 0x08244C8B))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 4)) (i32.const 0xBA))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 5)) (i32.and (local.get $pContainer) (i32.const 0xFF)))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 6)) (i32.and (i32.shr_u (local.get $pContainer) (i32.const 8)) (i32.const 0xFF)))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 7)) (i32.and (i32.shr_u (local.get $pContainer) (i32.const 16)) (i32.const 0xFF)))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 8)) (i32.and (i32.shr_u (local.get $pContainer) (i32.const 24)) (i32.const 0xFF)))
+    (call $gs32 (i32.add (local.get $thunk_root) (i32.const 9)) (i32.const 0xC0311189))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 13)) (i32.const 0xC2))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 14)) (i32.const 0x08))
+    (call $gs8 (i32.add (local.get $thunk_root) (i32.const 15)) (i32.const 0x00))
+
+    ;; Thunk 5: GetChildContainer: mov ecx, [esp+12]; mov edx, pContainer; mov [ecx], edx; xor eax, eax; ret 12
+    ;; Bytes: 8B 4C 24 0C  BA <pContainer:4>  89 11 31 C0  C2 0C 00
+    (call $gs32 (local.get $thunk_child) (i32.const 0x0C244C8B))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 4)) (i32.const 0xBA))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 5)) (i32.and (local.get $pContainer) (i32.const 0xFF)))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 6)) (i32.and (i32.shr_u (local.get $pContainer) (i32.const 8)) (i32.const 0xFF)))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 7)) (i32.and (i32.shr_u (local.get $pContainer) (i32.const 16)) (i32.const 0xFF)))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 8)) (i32.and (i32.shr_u (local.get $pContainer) (i32.const 24)) (i32.const 0xFF)))
+    (call $gs32 (i32.add (local.get $thunk_child) (i32.const 9)) (i32.const 0xC0311189))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 13)) (i32.const 0xC2))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 14)) (i32.const 0x0C))
+    (call $gs8 (i32.add (local.get $thunk_child) (i32.const 15)) (i32.const 0x00))
+
+    ;; Thunk 6: EnumChildContainerNames: mov ecx, [esp+12]; mov dword ptr [ecx], 0x0030; xor eax, eax; ret 16; nop
+    ;; Bytes: 8B 4C 24 0C  C7 01 30 00  00 00 31 C0  C2 10 00 90
+    (call $gs32 (local.get $thunk_enum_child) (i32.const 0x0C244C8B))
+    (call $gs32 (i32.add (local.get $thunk_enum_child) (i32.const 4)) (i32.const 0x003001C7))
+    (call $gs32 (i32.add (local.get $thunk_enum_child) (i32.const 8)) (i32.const 0xC0310000))
+    (call $gs32 (i32.add (local.get $thunk_enum_child) (i32.const 12)) (i32.const 0x900010C2))
+
+    ;; Thunk 7: RetCount0: mov ecx, [esp+8]; test ecx, ecx; jz +6; mov dword ptr [ecx], 0; xor eax, eax; ret 8; nop
+    ;; Bytes: 8B 4C 24 08  85 C9 74 06  C7 01 00 00  00 00 31 C0  C2 08 00 90
+    (call $gs32 (local.get $thunk_ret_count0) (i32.const 0x08244C8B))
+    (call $gs32 (i32.add (local.get $thunk_ret_count0) (i32.const 4)) (i32.const 0x0674C985))
+    (call $gs32 (i32.add (local.get $thunk_ret_count0) (i32.const 8)) (i32.const 0x000001C7))
+    (call $gs32 (i32.add (local.get $thunk_ret_count0) (i32.const 12)) (i32.const 0xC0310000))
+    (call $gs32 (i32.add (local.get $thunk_ret_count0) (i32.const 16)) (i32.const 0x900008C2))
+
+    ;; Thunk 8: EnumPropNames: mov eax, 0x80004005; ret 16
+    ;; Bytes: B8 05 40 00 80  C2 10 00
+    (call $gs32 (local.get $thunk_enum_props) (i32.const 0x004005B8))
+    (call $gs32 (i32.add (local.get $thunk_enum_props) (i32.const 4)) (i32.const 0x0010C280))
+
+    ;; Thunk 9: GetProp: mov eax, 0x80004005; ret 12
+    ;; Bytes: B8 05 40 00 80  C2 0C 00
+    (call $gs32 (local.get $thunk_get_prop) (i32.const 0x004005B8))
+    (call $gs32 (i32.add (local.get $thunk_get_prop) (i32.const 4)) (i32.const 0x000CC280))
+
+    (global.set $dxdiag_provider_obj (local.get $pProvider))
+    (global.set $dxdiag_container_obj (local.get $pContainer))
+    (local.get $pProvider))
+
   ;; 769: CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv) — 5 args stdcall
   (func $handle_CoCreateInstance (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
     (local $hr i32) (local $clsid_d1 i32) (local $obj_guest i32)
@@ -3302,7 +3439,12 @@
       (if (call $guid_words_equal (local.get $clsid_wa)
             (i32.const 0xD7B70EE0) (i32.const 0x11CF4340)
             (i32.const 0x200063B0) (i32.const 0x35CDC2AF))
-        (then (local.set $local_class (i32.const 9))))))
+        (then (local.set $local_class (i32.const 9))))
+      ;; CLSID_DxDiagProvider {A65B8071-3BFE-4213-9A5B-491DA4461CA7}.
+      (if (call $guid_words_equal (local.get $clsid_wa)
+            (i32.const 0xA65B8071) (i32.const 0x42133BFE)
+            (i32.const 0x1D495B9A) (i32.const 0xA71C46A4))
+        (then (local.set $local_class (i32.const 11))))))
 
     (if (local.get $local_class) (then
       (if (i32.eqz (local.get $arg4))
@@ -3314,6 +3456,18 @@
       (if (local.get $arg1)
         (then
           (i32.store offset=0 (global.get $reg_base) (i32.const 0x80040110)) ;; CLASS_E_NOAGGREGATION
+          (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24)))
+          (return)))
+      (if (i32.eq (local.get $local_class) (i32.const 11))
+        (then
+          (local.set $obj_guest (call $dxdiag_mock_init))
+          (if (i32.eqz (local.get $obj_guest))
+            (then
+              (i32.store offset=0 (global.get $reg_base) (i32.const 0x8007000E)) ;; E_OUTOFMEMORY
+              (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24)))
+              (return)))
+          (call $gs32 (local.get $arg4) (local.get $obj_guest))
+          (i32.store offset=0 (global.get $reg_base) (i32.const 0)) ;; S_OK
           (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24)))
           (return)))
       (if (i32.eq (local.get $local_class) (i32.const 1))

@@ -1343,6 +1343,87 @@
     (i32.store offset=4 (local.get $addr) (local.get $ctrl_id))
     (local.get $old))
 
+  (func $tab_wndproc (param $hwnd i32) (param $msg i32) (param $wParam i32) (param $lParam i32) (result i32)
+    (local $state i32) (local $sw ptr<TabNativeState>) (local $prc_wa i32)
+    (local $old_sel i32) (local $parent i32) (local $nmhdr i32) (local $nm_wa i32)
+    (local.set $state (call $tab_native_state_get (local.get $hwnd) (i32.const 0)))
+    (if (local.get $state)
+      (then
+        (local.set $sw (cast ptr<TabNativeState> (call $g2w (local.get $state))))
+        (local.set $old_sel (load.field.memarg TabNativeState selected (local.get $sw)))))
+    (call $tab_native_note_message
+      (local.get $hwnd) (local.get $msg) (local.get $wParam) (local.get $lParam))
+    ;; TCM_INSERTITEMA (0x1307) / TCM_INSERTITEMW (0x133E)
+    (if (i32.or (i32.eq (local.get $msg) (i32.const 0x1307))
+                (i32.eq (local.get $msg) (i32.const 0x133E)))
+      (then (return (local.get $wParam))))
+    ;; TCM_DELETEALLITEMS (0x1309)
+    (if (i32.eq (local.get $msg) (i32.const 0x1309))
+      (then (return (i32.const 1))))
+    ;; TCM_GETITEMCOUNT (0x1304)
+    (if (i32.eq (local.get $msg) (i32.const 0x1304))
+      (then
+        (if (local.get $state)
+          (then (return (load.field TabNativeState count (local.get $sw)))))
+        (return (i32.const 0))))
+    ;; TCM_GETCURSEL (0x130B)
+    (if (i32.eq (local.get $msg) (i32.const 0x130B))
+      (then (return (call $tab_native_cursel (local.get $hwnd)))))
+    ;; TCM_SETCURSEL (0x130C)
+    (if (i32.eq (local.get $msg) (i32.const 0x130C))
+      (then (return (local.get $old_sel))))
+    ;; TCM_ADJUSTRECT (0x1328)
+    (if (i32.eq (local.get $msg) (i32.const 0x1328))
+      (then
+        (if (local.get $lParam)
+          (then
+            (local.set $prc_wa (call $g2w (local.get $lParam)))
+            (if (i32.eqz (local.get $wParam))
+              (then
+                ;; bLarger == FALSE: display area inset from window rect
+                (i32.store (local.get $prc_wa) (i32.add (i32.load (local.get $prc_wa)) (i32.const 4)))
+                (i32.store offset=4 (local.get $prc_wa) (i32.add (i32.load offset=4 (local.get $prc_wa)) (i32.const 24)))
+                (i32.store offset=8 (local.get $prc_wa) (i32.sub (i32.load offset=8 (local.get $prc_wa)) (i32.const 4)))
+                (i32.store offset=12 (local.get $prc_wa) (i32.sub (i32.load offset=12 (local.get $prc_wa)) (i32.const 4))))
+              (else
+                ;; bLarger == TRUE: window rect outdented from display area
+                (i32.store (local.get $prc_wa) (i32.sub (i32.load (local.get $prc_wa)) (i32.const 4)))
+                (i32.store offset=4 (local.get $prc_wa) (i32.sub (i32.load offset=4 (local.get $prc_wa)) (i32.const 24)))
+                (i32.store offset=8 (local.get $prc_wa) (i32.add (i32.load offset=8 (local.get $prc_wa)) (i32.const 4)))
+                (i32.store offset=12 (local.get $prc_wa) (i32.add (i32.load offset=12 (local.get $prc_wa)) (i32.const 4)))))))
+        (return (i32.const 1))))
+    ;; WM_PAINT (0x000F)
+    (if (i32.eq (local.get $msg) (i32.const 0x000F))
+      (then
+        (call $update_clear_hwnd (local.get $hwnd))
+        (call $paint_flag_clear_hwnd (local.get $hwnd))
+        (return (call $tab_native_paint (local.get $hwnd)))))
+    ;; WM_ERASEBKGND (0x0014)
+    (if (i32.eq (local.get $msg) (i32.const 0x0014))
+      (then (return (i32.const 1))))
+    ;; WM_LBUTTONDOWN (0x0201)
+    (if (i32.eq (local.get $msg) (i32.const 0x0201))
+      (then
+        (if (local.get $state)
+          (then
+            (if (i32.ne (load.field.memarg TabNativeState selected (local.get $sw)) (local.get $old_sel))
+              (then
+                (local.set $parent (call $wnd_get_parent (local.get $hwnd)))
+                (if (local.get $parent)
+                  (then
+                    (local.set $nmhdr (call $heap_alloc (i32.const 12)))
+                    (if (local.get $nmhdr)
+                      (then
+                        (local.set $nm_wa (call $g2w (local.get $nmhdr)))
+                        (i32.store (local.get $nm_wa) (local.get $hwnd))
+                        (i32.store offset=4 (local.get $nm_wa) (call $ctrl_table_get_id (local.get $hwnd)))
+                        (i32.store offset=8 (local.get $nm_wa) (i32.const -551)) ;; TCN_SELCHANGE (-551)
+                        (drop (call $wnd_send_message (local.get $parent) (i32.const 0x004E)
+                          (call $ctrl_table_get_id (local.get $hwnd)) (local.get $nmhdr)))
+                        (call $heap_free (local.get $nmhdr))))))))))
+        (return (i32.const 0))))
+    (i32.const 0))
+
   ;; One encoding for native check state; preserve pressed/default/focus bits.
   (func $btn_normalize_check (param $hwnd i32) (param $check i32) (result i32)
     (local $kind i32)
@@ -1549,6 +1630,8 @@
     (param $hwnd i32) (param $msg i32) (param $wParam i32) (param $lParam i32) (result i32)
     (local $class i32)
     (local.set $class (call $ctrl_table_get_class (local.get $hwnd)))
+    (if (call $tab_native_is (local.get $hwnd))
+      (then (return (call $tab_wndproc (local.get $hwnd) (local.get $msg) (local.get $wParam) (local.get $lParam)))))
     ;; Disabled appearance belongs to the control procedure, not EnableWindow
     ;; itself. Guest windows may disable/re-enable themselves while painting
     ;; without requesting another WM_PAINT (Klotski does exactly that).

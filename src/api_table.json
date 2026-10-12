@@ -38484,5 +38484,295 @@
     "convention": "stdcall",
     "hash": 1017740128,
     "handler": "IDirect3DCubeTexture9_AddDirtyRect"
+  },
+  {
+    "id": 4523,
+    "name": "PathIsDirectoryA",
+    "nargs": 1,
+    "convention": "stdcall",
+    "hash": 3117359720,
+    "args": [
+      {
+        "name": "pszPath",
+        "type": "LPCSTR"
+      }
+    ],
+    "ret": "BOOL"
+  },
+  {
+    "id": 4524,
+    "name": "PathRemoveExtensionA",
+    "nargs": 1,
+    "convention": "stdcall",
+    "hash": 538281638,
+    "args": [
+      {
+        "name": "pszPath",
+        "type": "LPSTR"
+      }
+    ],
+    "ret": "VOID"
+  },
+  {
+    "id": 4525,
+    "name": "GetOverlappedResult",
+    "nargs": 4,
+    "convention": "stdcall",
+    "hash": 1846081022,
+    "args": [
+      {
+        "name": "hFile",
+        "type": "HANDLE"
+      },
+      {
+        "name": "lpOverlapped",
+        "type": "LPOVERLAPPED"
+      },
+      {
+        "name": "lpNumberOfBytesTransferred",
+        "type": "LPDWORD"
+      },
+      {
+        "name": "bWait",
+        "type": "BOOL"
+      }
+    ],
+    "ret": "BOOL"
+  },
+  {
+    "id": 4526,
+    "name": "WSARecv",
+    "nargs": 7,
+    "convention": "stdcall",
+    "hash": 3419542478,
+    "args": [
+      {
+        "name": "s",
+        "type": "SOCKET"
+      },
+      {
+        "name": "lpBuffers",
+        "type": "LPWSABUF"
+      },
+      {
+        "name": "dwBufferCount",
+        "type": "DWORD"
+      },
+      {
+        "name": "lpNumberOfBytesRecvd",
+        "type": "LPDWORD"
+      },
+      {
+        "name": "lpFlags",
+        "type": "LPDWORD"
+      },
+      {
+        "name": "lpOverlapped",
+        "type": "LPWSAOVERLAPPED"
+      },
+      {
+        "name": "lpCompletionRoutine",
+        "type": "LPWSAOVERLAPPED_COMPLETION_ROUTINE"
+      }
+    ],
+    "ret": "INT"
+  },
+  {
+    "id": 4527,
+    "name": "D3DXCreateTexture",
+    "nargs": 8,
+    "convention": "stdcall",
+    "hash": 2913704195
+  },
+  {
+    "id": 4528,
+    "name": "_CIsqrt",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 2576295584
+  },
+  {
+    "id": 4529,
+    "name": "_CIsin",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 2369003352
+  },
+  {
+    "id": 4530,
+    "name": "_CIcos",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 2055234749
+  },
+  {
+    "id": 4531,
+    "name": "_CItan",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 3496809741
+  },
+  {
+    "id": 4532,
+    "name": "_CIatan",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 78959340
+  },
+  {
+    "id": 4533,
+    "name": "_CIatan2",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 1185411962
+  },
+  {
+    "id": 4534,
+    "name": "_CIlog",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 773583536
+  },
+  {
+    "id": 4535,
+    "name": "_CIexp",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 185437581
+  },
+  {
+    "id": 4536,
+    "name": "_CIasin",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 3243683673
+  },
+  {
+    "id": 4537,
+    "name": "_CIacos",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 108695848
+  },
+  {
+    "id": 4538,
+    "name": "_CIsinh",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 2030901392
+  },
+  {
+    "id": 4539,
+    "name": "_CIcosh",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 2904472399
+  },
+  {
+    "id": 4540,
+    "name": "_CItanh",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 2159586815
+  },
+  {
+    "id": 4541,
+    "name": "_clearfp",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 1685360017
+  },
+  {
+    "id": 4542,
+    "name": "_clear87",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 367416662
+  },
+  {
+    "id": 4543,
+    "name": "_statusfp",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 4237870358
+  },
+  {
+    "id": 4544,
+    "name": "_status87",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 1343522365
+  },
+  {
+    "id": 4545,
+    "name": "_control87",
+    "nargs": 2,
+    "convention": "cdecl",
+    "hash": 1235328578
+  },
+  {
+    "id": 4546,
+    "name": "_fpreset",
+    "nargs": 0,
+    "convention": "cdecl",
+    "hash": 2833704615
+  },
+  {
+    "id": 4547,
+    "name": "_finite",
+    "nargs": 2,
+    "convention": "cdecl",
+    "hash": 2447041661
+  },
+  {
+    "id": 4548,
+    "name": "_isnan",
+    "nargs": 2,
+    "convention": "cdecl",
+    "hash": 589347075
+  },
+  {
+    "id": 4549,
+    "name": "_copysign",
+    "nargs": 4,
+    "convention": "cdecl",
+    "hash": 938731598
+  },
+  {
+    "id": 4550,
+    "name": "_chgsign",
+    "nargs": 2,
+    "convention": "cdecl",
+    "hash": 3522462795
+  },
+  {
+    "id": 4551,
+    "name": "_fpclass",
+    "nargs": 2,
+    "convention": "cdecl",
+    "hash": 1595948848
+  },
+  {
+    "id": 4552,
+    "name": "longjmp",
+    "nargs": 2,
+    "convention": "cdecl",
+    "hash": 3371346902
+  },
+  {
+    "id": 4553,
+    "name": "setjmp",
+    "nargs": 1,
+    "convention": "cdecl",
+    "hash": 3214383622,
+    "handler": "_setjmp3"
+  },
+  {
+    "id": 4554,
+    "name": "_setjmp",
+    "nargs": 1,
+    "convention": "cdecl",
+    "hash": 3010479025,
+    "handler": "_setjmp3"
   }
 ]

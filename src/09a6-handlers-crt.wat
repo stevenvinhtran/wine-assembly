@@ -1024,6 +1024,90 @@
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
   )
 
+  (func $handle__CIsqrt (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (f64.sqrt (call $fpu_pop)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIsin (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (call $host_math_sin (call $fpu_pop)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIcos (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (call $host_math_cos (call $fpu_pop)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CItan (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (call $host_math_tan (call $fpu_pop)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIatan (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (call $host_math_atan2 (call $fpu_pop) (f64.const 1.0)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIatan2 (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $x f64) (local $y f64)
+    (local.set $x (call $fpu_pop))
+    (local.set $y (call $fpu_pop))
+    (call $fpu_push (call $host_math_atan2 (local.get $y) (local.get $x)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIlog (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (f64.mul (call $host_math_log2 (call $fpu_pop)) (f64.const 0.69314718055994530942)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIexp (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (call $host_math_pow2 (f64.div (call $fpu_pop) (f64.const 0.69314718055994530942))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIasin (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $x f64)
+    (local.set $x (call $fpu_pop))
+    (call $fpu_push (call $host_math_atan2 (local.get $x) (f64.sqrt (f64.sub (f64.const 1.0) (f64.mul (local.get $x) (local.get $x))))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIacos (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $x f64)
+    (local.set $x (call $fpu_pop))
+    (call $fpu_push (call $host_math_atan2 (f64.sqrt (f64.sub (f64.const 1.0) (f64.mul (local.get $x) (local.get $x)))) (local.get $x)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIsinh (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $x f64) (local $ep f64) (local $en f64)
+    (local.set $x (call $fpu_pop))
+    (local.set $ep (call $host_math_pow2 (f64.div (local.get $x) (f64.const 0.69314718055994530942))))
+    (local.set $en (call $host_math_pow2 (f64.div (f64.neg (local.get $x)) (f64.const 0.69314718055994530942))))
+    (call $fpu_push (f64.mul (f64.sub (local.get $ep) (local.get $en)) (f64.const 0.5)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CIcosh (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $x f64) (local $ep f64) (local $en f64)
+    (local.set $x (call $fpu_pop))
+    (local.set $ep (call $host_math_pow2 (f64.div (local.get $x) (f64.const 0.69314718055994530942))))
+    (local.set $en (call $host_math_pow2 (f64.div (f64.neg (local.get $x)) (f64.const 0.69314718055994530942))))
+    (call $fpu_push (f64.mul (f64.add (local.get $ep) (local.get $en)) (f64.const 0.5)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__CItanh (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $x f64) (local $ep f64) (local $en f64)
+    (local.set $x (call $fpu_pop))
+    (local.set $ep (call $host_math_pow2 (f64.div (local.get $x) (f64.const 0.69314718055994530942))))
+    (local.set $en (call $host_math_pow2 (f64.div (f64.neg (local.get $x)) (f64.const 0.69314718055994530942))))
+    (call $fpu_push (f64.div (f64.sub (local.get $ep) (local.get $en)) (f64.add (local.get $ep) (local.get $en))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
   ;; 759: _ftol — cdecl MSVC helper, ST(0) -> signed i64 in EDX:EAX.
   ;;
   ;; Win98 MSVCRT saves the caller's control word, temporarily selects truncate
@@ -3429,14 +3513,71 @@
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
   )
 
-  ;; _setjmp3(jmp_buf, ...) — cdecl. First return from setjmp is zero; the
-  ;; caller retains varargs cleanup. Store a conservative zeroed frame so code
-  ;; that inspects the buffer does not see stale heap/stack bytes.
+  ;; _setjmp3(jmp_buf, ...) — cdecl.
   (func $handle__setjmp3 (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $i i32)
     (if (local.get $arg0)
-      (then (call $zero_memory (call $g2w (local.get $arg0)) (i32.const 64))))
+      (then
+        ;; EBP
+        (call $gs32 (local.get $arg0) (i32.load offset=20 (global.get $reg_base)))
+        ;; EBX
+        (call $gs32 (i32.add (local.get $arg0) (i32.const 4)) (i32.load offset=12 (global.get $reg_base)))
+        ;; EDI
+        (call $gs32 (i32.add (local.get $arg0) (i32.const 8)) (i32.load offset=28 (global.get $reg_base)))
+        ;; ESI
+        (call $gs32 (i32.add (local.get $arg0) (i32.const 12)) (i32.load offset=24 (global.get $reg_base)))
+        ;; ESP: caller's ESP after return (current ESP + 4)
+        (call $gs32 (i32.add (local.get $arg0) (i32.const 16))
+          (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+        ;; EIP: return address at [ESP]
+        (call $gs32 (i32.add (local.get $arg0) (i32.const 20))
+          (call $gl32 (i32.load offset=16 (global.get $reg_base))))
+        ;; Registration: FS:[0]
+        (call $gs32 (i32.add (local.get $arg0) (i32.const 24))
+          (call $gl32 (global.get $fs_base)))
+        ;; Copy up to 6 optional SEH registration DWORDs if count > 0
+        (if (i32.gt_s (local.get $arg1) (i32.const 0))
+          (then
+            (local.set $i (i32.const 0))
+            (block $seh_done
+              (loop $seh_copy
+                (if (i32.ge_s (local.get $i) (local.get $arg1)) (then (br $seh_done)))
+                (if (i32.ge_s (local.get $i) (i32.const 6)) (then (br $seh_done)))
+                (call $gs32
+                  (i32.add (local.get $arg0) (i32.add (i32.const 28) (i32.shl (local.get $i) (i32.const 2))))
+                  (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.add (i32.const 12) (i32.shl (local.get $i) (i32.const 2))))))
+                (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                (br $seh_copy)))))
+      ))
     (i32.store offset=0 (global.get $reg_base) (i32.const 0))
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  ;; longjmp(jmp_buf, val) — cdecl
+  (func $handle_longjmp (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $val i32) (local $seh i32)
+    (if (i32.eqz (local.get $arg0)) (then (return)))
+    ;; Return value in EAX: val != 0 ? val : 1
+    (local.set $val (select (local.get $arg1) (i32.const 1) (i32.ne (local.get $arg1) (i32.const 0))))
+    (i32.store offset=0 (global.get $reg_base) (local.get $val))
+    ;; EBP
+    (i32.store offset=20 (global.get $reg_base) (call $gl32 (local.get $arg0)))
+    ;; EBX
+    (i32.store offset=12 (global.get $reg_base) (call $gl32 (i32.add (local.get $arg0) (i32.const 4))))
+    ;; EDI
+    (i32.store offset=28 (global.get $reg_base) (call $gl32 (i32.add (local.get $arg0) (i32.const 8))))
+    ;; ESI
+    (i32.store offset=24 (global.get $reg_base) (call $gl32 (i32.add (local.get $arg0) (i32.const 12))))
+    ;; ESP
+    (i32.store offset=16 (global.get $reg_base) (call $gl32 (i32.add (local.get $arg0) (i32.const 16))))
+    ;; SEH registration
+    (local.set $seh (call $gl32 (i32.add (local.get $arg0) (i32.const 24))))
+    (if (local.get $seh)
+      (then (call $gs32 (global.get $fs_base) (local.get $seh))))
+    ;; EIP
+    (global.set $eip (call $gl32 (i32.add (local.get $arg0) (i32.const 20))))
+    (global.set $steps (i32.const 0))
+    (global.set $handler_set_eip (i32.const 1))
   )
 
   ;; ── CRT exports answered natively, with the authentic export behind them ──
@@ -3555,6 +3696,9 @@
   ;; setlocale(category, locale) / _wsetlocale — cdecl. A NULL locale is a
   ;; query and "C" keeps the C locale; anything else may leave it, so mark the
   ;; process before the authentic setlocale runs.
+  (global $crt_locale_string_ptr (mut i32) (i32.const 0))
+  (global $crt_wlocale_string_ptr (mut i32) (i32.const 0))
+
   (func $handle_setlocale (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
     (if (i32.ne (local.get $arg1) (i32.const 0))
       (then
@@ -3563,7 +3707,15 @@
               (i32.eqz (call $gl8 (i32.add (local.get $arg1) (i32.const 1))))))
           (then (i32.atomic.store offset=4 (global.get $CRT_OVERRIDE_TABLE) (i32.const 1))))))
     (if (call $crt_fallback) (then (return)))
-    (call $crash_unimplemented (local.get $name_ptr)))
+    (if (i32.eqz (global.get $crt_locale_string_ptr))
+      (then
+        (global.set $crt_locale_string_ptr (call $heap_alloc (i32.const 16)))
+        (if (global.get $crt_locale_string_ptr)
+          (then
+            (call $gs8 (global.get $crt_locale_string_ptr) (i32.const 0x43))
+            (call $gs8 (i32.add (global.get $crt_locale_string_ptr) (i32.const 1)) (i32.const 0))))))
+    (i32.store offset=0 (global.get $reg_base) (global.get $crt_locale_string_ptr))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4))))
 
   (func $handle__wsetlocale (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
     (if (i32.ne (local.get $arg1) (i32.const 0))
@@ -3573,7 +3725,15 @@
               (i32.eqz (call $gl16 (i32.add (local.get $arg1) (i32.const 2))))))
           (then (i32.atomic.store offset=4 (global.get $CRT_OVERRIDE_TABLE) (i32.const 1))))))
     (if (call $crt_fallback) (then (return)))
-    (call $crash_unimplemented (local.get $name_ptr)))
+    (if (i32.eqz (global.get $crt_wlocale_string_ptr))
+      (then
+        (global.set $crt_wlocale_string_ptr (call $heap_alloc (i32.const 16)))
+        (if (global.get $crt_wlocale_string_ptr)
+          (then
+            (call $gs16 (global.get $crt_wlocale_string_ptr) (i32.const 0x43))
+            (call $gs16 (i32.add (global.get $crt_wlocale_string_ptr) (i32.const 2)) (i32.const 0))))))
+    (i32.store offset=0 (global.get $reg_base) (global.get $crt_wlocale_string_ptr))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4))))
 
   ;; __ascii_towlower: the C-locale fold every VC6-VC7.1 wide compare uses.
   (func $crt_ascii_towlower (param $c i32) (result i32)

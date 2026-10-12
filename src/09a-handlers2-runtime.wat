@@ -170,6 +170,130 @@
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
   )
 
+  (func $handle__control87 (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $control i32) (local $mask i32)
+    (local.set $control (call $msvcrt_control_from_x87))
+    (local.set $mask (i32.and (local.get $arg1) (i32.const 0x000F031F)))
+    (local.set $control
+      (i32.or
+        (i32.and (local.get $control) (i32.xor (local.get $mask) (i32.const -1)))
+        (i32.and (local.get $arg0) (local.get $mask))))
+    (call $msvcrt_control_to_x87 (local.get $control))
+    (i32.store offset=0 (global.get $reg_base) (call $msvcrt_control_from_x87))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $msvcrt_status_from_x87 (result i32)
+    (local $sw i32) (local $res i32)
+    (local.set $sw (global.get $fpu_sw))
+    (if (i32.and (local.get $sw) (i32.const 0x01))
+      (then (local.set $res (i32.or (local.get $res) (i32.const 0x00000010)))))
+    (if (i32.and (local.get $sw) (i32.const 0x02))
+      (then (local.set $res (i32.or (local.get $res) (i32.const 0x00080000)))))
+    (if (i32.and (local.get $sw) (i32.const 0x04))
+      (then (local.set $res (i32.or (local.get $res) (i32.const 0x00000008)))))
+    (if (i32.and (local.get $sw) (i32.const 0x08))
+      (then (local.set $res (i32.or (local.get $res) (i32.const 0x00000004)))))
+    (if (i32.and (local.get $sw) (i32.const 0x10))
+      (then (local.set $res (i32.or (local.get $res) (i32.const 0x00000002)))))
+    (if (i32.and (local.get $sw) (i32.const 0x20))
+      (then (local.set $res (i32.or (local.get $res) (i32.const 0x00000001)))))
+    (local.get $res))
+
+  (func $handle__clearfp (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $old i32)
+    (local.set $old (call $msvcrt_status_from_x87))
+    (global.set $fpu_sw (i32.and (global.get $fpu_sw) (i32.const 0x7F00)))
+    (i32.store offset=0 (global.get $reg_base) (local.get $old))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__clear87 (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $handle__clearfp (local.get $arg0) (local.get $arg1) (local.get $arg2) (local.get $arg3) (local.get $arg4) (local.get $name_ptr))
+  )
+
+  (func $handle__statusfp (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (i32.store offset=0 (global.get $reg_base) (call $msvcrt_status_from_x87))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  (func $handle__status87 (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $handle__statusfp (local.get $arg0) (local.get $arg1) (local.get $arg2) (local.get $arg3) (local.get $arg4) (local.get $name_ptr))
+  )
+
+  (func $handle__fpreset (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (global.set $fpu_cw (i32.const 0x037F))
+    (global.set $fpu_sw (i32.const 0))
+    (global.set $fpu_tag (i32.const 0xFFFF))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  ;; _finite(double x) — cdecl, 1 if finite, 0 if NaN or Inf
+  (func $handle__finite (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (i32.store offset=0 (global.get $reg_base)
+      (i32.ne (i32.and (i32.shr_u (local.get $arg1) (i32.const 20)) (i32.const 0x7FF)) (i32.const 0x7FF)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  ;; _isnan(double x) — cdecl, 1 if NaN, 0 otherwise
+  (func $handle__isnan (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (i32.store offset=0 (global.get $reg_base)
+      (i32.and
+        (i32.eq (i32.and (i32.shr_u (local.get $arg1) (i32.const 20)) (i32.const 0x7FF)) (i32.const 0x7FF))
+        (i32.or
+          (i32.ne (i32.and (local.get $arg1) (i32.const 0x000FFFFF)) (i32.const 0))
+          (i32.ne (local.get $arg0) (i32.const 0)))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  ;; _chgsign(double x) — cdecl, returns -x in ST(0)
+  (func $handle__chgsign (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push (f64.neg (f64.load (call $g2w (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4))))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  ;; _copysign(double x, double y) — cdecl, returns x with sign of y in ST(0)
+  (func $handle__copysign (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $fpu_push
+      (f64.copysign
+        (f64.load (call $g2w (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4))))
+        (f64.load (call $g2w (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 12))))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
+  ;; _fpclass(double x) — cdecl
+  (func $handle__fpclass (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $sign i32) (local $exp i32) (local $has_mantissa i32)
+    (local.set $sign (i32.shr_u (local.get $arg1) (i32.const 31)))
+    (local.set $exp (i32.and (i32.shr_u (local.get $arg1) (i32.const 20)) (i32.const 0x7FF)))
+    (local.set $has_mantissa (i32.or
+      (i32.ne (i32.and (local.get $arg1) (i32.const 0x000FFFFF)) (i32.const 0))
+      (i32.ne (local.get $arg0) (i32.const 0))))
+    (if (i32.eq (local.get $exp) (i32.const 0x7FF))
+      (then
+        (if (local.get $has_mantissa)
+          (then
+            (i32.store offset=0 (global.get $reg_base)
+              (select (i32.const 0x0002) (i32.const 0x0001) (i32.ne (i32.and (local.get $arg1) (i32.const 0x00080000)) (i32.const 0)))))
+          (else
+            (i32.store offset=0 (global.get $reg_base)
+              (select (i32.const 0x0004) (i32.const 0x0200) (local.get $sign))))))
+      (else
+        (if (i32.eq (local.get $exp) (i32.const 0))
+          (then
+            (if (local.get $has_mantissa)
+              (then
+                (i32.store offset=0 (global.get $reg_base)
+                  (select (i32.const 0x0010) (i32.const 0x0080) (local.get $sign))))
+              (else
+                (i32.store offset=0 (global.get $reg_base)
+                  (select (i32.const 0x0020) (i32.const 0x0040) (local.get $sign))))))
+          (else
+            (i32.store offset=0 (global.get $reg_base)
+              (select (i32.const 0x0008) (i32.const 0x0100) (local.get $sign)))))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)))
+  )
+
   ;; 212: _strrev
   (func $handle__strrev (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
     (local $v i32) (local $i i32) (local $j i32)
