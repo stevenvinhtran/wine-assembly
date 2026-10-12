@@ -675,3 +675,29 @@ Its Load Game attempt stopped before launch for missing
 on bx_n47sae4r; saved the failed log in0119Z-oni-worker-recovery. No Oni
 runtime progress claimed. Ops round8 instruction was still an unsent draft;
 main remained0304a8549, registration/source integration not completed.
+
+### Browser route, selection and remaining movement check (2026-10-12)
+
+bx_yry4rfby, Chrome155.0.8059.39, WebGL, worker threads and cross-origin
+isolation enabled. Actual freshly built module SHA256 is
+9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6,
+matching the earlier successful CLI build. Local loopback ops emulator server,
+full registration apps.js from codex/dr2-registration, no public hosting.
+The fork lacked prepared candidate assets: rebuilt them from the preserved
+archive with --prepare (27 files). Initial missing-file page is retained.
+
+Ordinary pointer-lock mouse input reaches the menu and Load Mission; lazy
+file loading (18 eager/9 on-demand) reaches Demo Mission1 cockpit intro,
+then the RTS view. Pointer calibration selected Brainsick difficulty, so this
+is not a normal-difficulty comparison to the CLI. before-selection.png then
+selected.png show actual box-selection brackets, health bars and Guard/Explore.
+A held left click places a green order marker, but moved.png after10s shows
+no visible unit displacement. Browser movement remains unverified; do not
+substitute the CLI movement result. Next investigate longer observation or
+guest simulation progress before changing input implementation. Touch and
+browser FPS also remain unverified.
+
+The final exec connection failed while the box became idle, but all named
+screenshots were recovered and visually reviewed. Owned browser/server PID
+was checked against its command line and stopped. Evidence and exact input
+route: scratch/runs/20261012T0127Z-dark-reign2-browser/.
