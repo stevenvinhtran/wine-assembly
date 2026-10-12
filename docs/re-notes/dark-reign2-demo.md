@@ -894,3 +894,36 @@ No new input-queue, pause or difficulty test needed. Next compare ordinary
 command acceptance/selection ownership using runtime/API evidence, not
 new guest disassembly. All evidence collected from bx_vhk6nrm7 before
 restoring Nocturne FMUL build. Main0304 still unchanged; ops integration.
+
+### Target-free unit commands work (2026-10-12 11:02Z)
+
+1056Z-dr2-semantic-commands, bx_224cjc5g, exact6b6d5633 control module,
+Chrome155/WebGL/worker, original Normal mission/box selection. Original
+readme.rtf documents X Scatter, V Wedge formation and Shift-O Orders menu.
+After X held500ms and15s, reviewed selected/scatter shows selected units
+widely displaced. Simulation1454->1611, guest tick205163->220811.
+Thus selected units can execute a player-issued command in this browser;
+general selection ownership or stopped simulation does not explain the
+failed ground-click route. V after15s has no separately established movement
+effect; Shift-O visibly opens Orders menu. Ground-target movement, audio,
+touch and FPS remain unqualified. No guest disassembly/state writes.
+
+Next compare existing FMUL462848051 correction on original targeted route:
+coordinate-dependent commands may expose arithmetic precision, but this
+is only a hypothesis until the A/B result. Do not redo queue/pause/timing
+or target-free control. Original CLI target movement remains prior evidence.
+
+### Existing FMUL correction does not fix ground targeting (11:08Z)
+
+1103Z-dr2-fmul-target restores already-tested FMUL462848051; buildPASS,
+module5e8f1716...69a matching Nocturne/Sanity candidate. Original browser
+route/Normal/selection/left-click unchanged,60s observation. Reviewed after60
+retains selected formation and green marker. Simulation1482->2087 while
+guest tick205887->266411 (60.524s). This correction does not recover targeted
+movement; no new emulator patch or performance claim.
+
+Combined with successful1056Z Scatter, next focus ground-target hit testing
+and mouse-command handling, comparing ordinary targets via runtime/API
+evidence. Selection ownership and general simulation are functioning; do
+not repeat queue/pause/difficulty/wait/Scatter/FMUL controls. All artifacts
+collected from sole boat bx_224cjc5g, main0304 unchanged, ops integration.
