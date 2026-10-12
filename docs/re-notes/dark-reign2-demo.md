@@ -738,3 +738,16 @@ change input or scheduling based only on the screenshot. Touch/FPS remain
 unverified. Script stage records complete and all artifacts were recovered;
 the outer boat exec returned141, so distinguish transport status from the
 completed browser capture. The script closes its browser/server in finally.
+
+### Cooperative-browser control (2026-10-12 02:41Z)
+
+Run0236Z-dark-reign2-no-threads uses the existing `?no-threads` switch, same
+Chrome155 and module9e835f75...8cd6, menu/mission/selection/order route and
+60-second observation. Reviewed selected/final screenshots show Threads
+unchecked, HUD and selected-unit brackets/health, with units still in the
+starting formation. This reproduces the failure without guest Workers; it
+does not support blaming worker-thread scheduling alone. Next compare guest
+command consumption and actual simulation-cycle progress with the working
+CLI, including its synthetic clock versus browser real-time clock. No
+runtime change made. Initial0234Z setup failure was missing Chrome cache in
+the fork; exact Chrome155 installed before the separate successful run.

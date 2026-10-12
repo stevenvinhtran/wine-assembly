@@ -163,3 +163,28 @@ checks pass. Fresh network fetch produced no completion receipt and remains
 unverified. Evidence `20261012T0206Z-oni-registration/validation.json`.
 Touch WASD/Action/Jump/Menu is declared but not yet validated. Registration
 is queued for ops integration, not merged or publicly deployed.
+
+## Registered browser gameplay verified (2026-10-12 02:51Z)
+
+Run0243Z-oni-browser on temporary bx_hqxvzbnm, Chrome155.0.8059.39,
+WebGL/Threads, viewport1000x800. Fresh build passed, actual module SHA256
+36029bde5328648e01f74b124c984c676745986acd47df945ca9a078b3bb26ef
+matches the CLI-tested build. The committed oni_demo entry and prepared
+32-file manifest reach the menu with no temporary app-registration override.
+
+Click465,550 opens Load Game. The attempted Warehouse row250,290 and
+Load200,690 instead entered TCTF Training; do not report a verified browser
+Warehouse selection. step2.png shows the orientation prompt. Ordinary mouse
+motion (500,500 ->150,500 ->550,500) turns the view and advances that prompt
+to WASD movement (step3). Holding W3s visibly moves Konoko and advances to
+diagonal movement (step4). A further turn plus W+A1.5s advances to the control
+console objective (step5). These game-owned prompt transitions and reviewed
+position changes verify player-controlled browser gameplay without guest
+patches. The standing-turn problem is not universal: it persisted in the
+earlier CLI tutorial probes but did not reproduce here.
+
+Exact mouse/key commands, screenshots, environment and logs are in the run
+folder. The final script stage is complete and its browser/server auto-closed;
+outer boat exec returned141, so use recovered script artifacts for completion.
+Touch controls, audio and FPS remain unverified. Next mobile/touch validation
+and ops integration; do not mark the game public or fully release-qualified.
