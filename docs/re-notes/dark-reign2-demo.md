@@ -632,3 +632,23 @@ call that a successful move order. Next verify the game's command binding
 (left contextual click versus right cancel), then capture movement and FPS.
 The bounded replay completed2900 batches in57.949s without a trap. No FPS
 inference from batches/s. Evidence control-*.png/log in the same run folder.
+
+### Ordinary unit movement verified (2026-10-12)
+
+Repeat the box-selection route, but use button1 down2110/up2120 at the target
+after relative(-200,-150). move-selected.png shows the selected formation;
+move-final.png shows the selected units grouped near (200,240), displaced
+from the earlier central formation. The prior button2 control-final.png at
+the same2900-batch endpoint retains the original formation and clears selection.
+This establishes ordinary player-issued movement, not just a camera change.
+The objective text also changed to 'Reinforce the JDA base'; no causal claim
+is made about that script change. Replay:2900 batches,55.592s, no trap.
+
+Reviewed terrain/units/HUD, selection and commanded movement now establish
+CLI gameplay. Browser and touch input, sound quality and scene-qualified FPS
+remain unverified. The title remains unregistered; registration must be a
+local-only fixture with relativeMouse:true and deliberate held pointer input.
+Source, archive hash and extraction layout are at the top of this note. No
+assets may be shipped by the registration; no public deployment is authorized.
+Evidence: move-selected.png, move-final.png, move-input.log, move-guest.log in
+scratch/runs/20261012T0045Z-dark-reign2-socket-attribute/.
