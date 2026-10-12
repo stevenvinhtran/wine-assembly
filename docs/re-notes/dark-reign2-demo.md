@@ -846,3 +846,36 @@ Simulation1479->2084 over60.499s, pause0 throughout. Difficulty mismatch does
 not explain the browser failure. Do not repeat difficulty/pause/hold controls.
 Next use runtime input/API observations to trace order delivery/consumption,
 including any internal network path, against CLI; no proven network cause yet.
+
+### Main prerequisite reconciliation (2026-10-12 07:45Z)
+
+0745Z-dr2-input-consumption used main0304a8549 plus only Z16fix, module
+3c3a4efe...fb4d. It therefore omitted pending Winsock prerequisites present
+in the earlier retained gameplay build. Reviewed after60 is a fatal WinSock
+socket-type/address-family dialog, simulation counter0. Queue head0/tail45
+and input routing to dialog10002/native child1000a are NOT a gameplay
+consumption test. Do not infer a queue bug from them. Reapply existing
+e8d741431/6b39197e1/1becfe6b5 Winsock work before comparing input on main;
+do not reimplement those fixes or treat this as a new game regression.
+
+### Input consumption on main plus prerequisites (2026-10-12 07:53Z)
+
+Applied existing pending Winsock source/test diff (saved0753Z-dr2-prerequisites/
+winsock.patch) to main0304a8549+Z16; build and69/69 Winsock checks PASS.
+Module6b6d56337acd65b64de5c2192efed64df64562f3865e602ccbb809a44be18ab1.
+0753Z-dr2-input-fixed starts07:53:02Z, completes07:57:29Z. Chrome155,WebGL,
+worker mode, Normal difficulty. Exact original input route and50ms read-only
+host queue sampling; no guest mutation. Selected/after60 screenshots reviewed.
+
+Relative mouse selection maps280200->400390, target200240. DI queue
+head/tail19/19->40/40->41/41->44/44->45/45; deltas drain to0, buttons1 then0.
+Renderer routing dispatches down to main10001 and matches corresponding up.
+Thus queue delivery/consumption works; it is not stuck behind an undrained
+mouse queue. Simulation1502->2106 over60.416guest seconds, pause0; observed
+networkmode8677bc remains0. Units still stationary despite green marker.
+No command-semantic acceptance/ownership conclusion yet; next investigate
+guest command handling/selection state via runtime evidence, or match the
+CLI post-order observation interval before another timing claim.
+
+Boat exec transport returned ECONNREFUSED but process kept running. Verified
+complete artifact and collected results before cleanup; no rerun/duplicate.
