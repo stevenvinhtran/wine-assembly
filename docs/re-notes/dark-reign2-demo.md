@@ -950,3 +950,21 @@ Audio/FPS/device qualification remains separate.
 Local wrapper returned null status/empty stdout early; remote stage stayed
 mission-loading and ultimately complete. Collected actual remote evidence,
 no duplicate run. Build/prepare/Chrome and evidence checks pass.
+
+### Touch order button verified with mouse positioning (11:47Z)
+
+1142Z-dr2-touch-order repeats the working registered route on exact6b6d
+module, enabling hasTouch at800x600 and replacing final mouse down/up with
+actual CDP touchStart/touchEnd on Select / Order, held500ms. Reviewed
+selected.png and after60.png show units displaced to the settled target.
+Button bounds center391.23,454 width157.55 height76. No runtime patch.
+
+This is mixed input: menus, box selection and target positioning still use
+mouse. It verifies the touch action button preserves the current cursor and
+issues an effective order; it does not establish touch-only selection, phone
+layout or rapid move-click behavior. Next actual trackpad movement plus
+held Select / Order drag selection, at phone landscape resolution. Audio,
+logical FPS and physical-device qualification remain open. Main0304 unchanged.
+
+Full fork fixture/prepare/build/Chrome preflight passed; command exited0,
+all named artifacts collected and evidence containment checks clean.
