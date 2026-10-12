@@ -586,3 +586,20 @@ not a played mission; ordinary input and gameplay remain to validate.
 shell32.dll is still absent from the test checkout (logged warning).
 Evidence: scratch/runs/20261012T0045Z-dark-reign2-socket-attribute/.
 Built module SHA256: 9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6.
+
+### Mission input follow-up (2026-10-12)
+
+A 45-second ordinary replay with 600:click:320:320 stayed in the shell
+(1566 batches, no trap). The input was logged, but this does not establish
+a game-side input bug. In test/run.js, click calls handleMouseDown and
+handleMouseUp consecutively before guest execution resumes. Renderer button
+state is set then cleared; DirectInput buffered events are also queued, so
+whether a game misses the pulse depends on its consumption path.
+
+Next replay: capture the menu at batch590, move to (320,320) at595, press
+at600 and release at610. The prepared next-input-route.json in the same
+evidence directory is explicitly unrun while Oni owns the runtime slot.
+Compare guest mission name and screenshot; missions/system/shell is only
+the menu world. If needed, inspect the game's polling path or use ordinary
+browser pointer input. Do not change emulator semantics merely to make a
+zero-duration synthetic click succeed.
