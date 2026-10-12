@@ -784,3 +784,26 @@ Next compare command consumption/simulation progress, accounting for the
 browser's Brainsick difficulty and pointer-coordinate mapping versus CLI.
 Do not repeat hold-duration or Threads-off controls already covered, or infer
 a timing fix from the CLI cinematic alone. No source change in this run.
+
+
+### Browser pause/explicit-command controls (2026-10-12 06:00Z)
+
+Run0600Z-dark-reign2-pause, Chrome155/WebGL/Threads and same9e835f75 module,
+restored original registered fixture. Same Brainsick/menu route reaches HUD.
+Original readme identifies Pause (pause), ScrollLock (frame advance), Shift-M
+(explicit Move). Executable strings include timing.pause, client.pause and a
+warning to use client.pause rather than altering simulation timing directly.
+
+Ordinary Pause press, then held500ms Pause plus selection/order: still original
+formation/objective after15seconds (step2). Eight ScrollLock down/up150ms pairs
+(step3), then held Pause again, Shift-M and ground order plus20seconds (step4):
+no displacement. Input logs show delivered VK13hex Pause,91hex ScrollLock and
+Shift/M; no visible Paused indicator in reviewed captures. This does NOT prove
+the guest pause state toggled or rule out swallowed DirectInput key state.
+No runtime fix. Next inspect actual simulation cycle/pause gate and command
+consumption with matched CLI state, instead of repeating these keyboard controls.
+
+Initial0555Z attempt did not launch: fresh fork omitted test/binaries fixture.
+Restore original archive plus extractedFiles and run --prepare; successful0600Z
+is separate. Failed initial capture retained. Probe now checks HTTP status before
+waiting through the route. No public deploy, laptop HeroesII untouched.

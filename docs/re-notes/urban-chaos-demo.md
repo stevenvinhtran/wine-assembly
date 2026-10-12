@@ -111,3 +111,22 @@ movies=1
 [TextureClumps]
 enable_clumps=1
 ```
+
+
+## Registered Chromium gameplay and touch (2026-10-12 05:50Z)
+
+0550Z-urban-chaos-browser: Chrome155.0.8059.39/WebGL/worker threads, module
+9e835f75..8cd6, registered urban_chaos_demo. Ordinary setup Okay, held Enter
+through title/map/briefing reaches player HUD (step4). ArrowUp3seconds moves
+D'arci toward the alley confrontation (step5). At844x390, real CDP touch on the
+direction pad held upward7seconds advances D'arci farther into the alley
+(step6 before, step7 after). All images reviewed, stage complete05:54Z.
+No source fix required. Buttons fit at844x390; other action bindings, physical
+phone/Safari, audio and FPS are not qualified. AudioContext autoplay warnings
+remain in run.log; no claim of working sound.
+
+Initial0549Z attempt never launched: server rejects out-of-checkout fixture
+symlinks. Original payload existed, but game/ linked to a custom remote directory.
+Copied original files into test/binaries/candidates/urban-chaos-demo/game and
+replayed as0550Z; do not weaken server containment checks. Keep real files inside
+the served checkout for browser preparation. Failed capture/log retained.
