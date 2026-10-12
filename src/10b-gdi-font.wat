@@ -1739,15 +1739,19 @@
     ;; identity MAT2, but reject transforms until the bitmap transformer exists.
     (if (local.get $mat2)
       (then
-        (if (i32.or
-              (i32.ne (i32.load (local.get $mat2)) (i32.const 0x00010000))
-              (i32.or
-                (i32.ne (i32.load offset=4 (local.get $mat2)) (i32.const 0))
-                (i32.or
-                  (i32.ne (i32.load offset=8 (local.get $mat2)) (i32.const 0))
-                  (i32.ne (i32.load offset=12 (local.get $mat2))
-                    (i32.const 0x00010000)))))
-          (then (return (i32.const -1))))))
+        (if (i32.and (i32.eqz (i32.load (local.get $mat2)))
+                     (i32.eqz (i32.load offset=12 (local.get $mat2))))
+          (then (nop))
+          (else
+            (if (i32.or
+                  (i32.ne (i32.load (local.get $mat2)) (i32.const 0x00010000))
+                  (i32.or
+                    (i32.ne (i32.load offset=4 (local.get $mat2)) (i32.const 0))
+                    (i32.or
+                      (i32.ne (i32.load offset=8 (local.get $mat2)) (i32.const 0))
+                      (i32.ne (i32.load offset=12 (local.get $mat2))
+                        (i32.const 0x00010000)))))
+              (then (return (i32.const -1))))))))
     (local.set $glyph (call $gdi_bitmap_font_glyph
       (local.get $strike) (i32.and (local.get $character) (i32.const 0xFF))))
     (local.set $native_width (i32.load16_u (local.get $glyph)))
@@ -1798,8 +1802,10 @@
           (i64.mul (i64.extend_i32_u (i32.load offset=24 (local.get $strike)))
             (i64.extend_i32_u (local.get $height)))
           (i64.extend_i32_u (local.get $native_height))))))
-    (i32.store (local.get $metrics_out) (local.get $black_width))
-    (i32.store offset=4 (local.get $metrics_out) (local.get $black_height))
+    (i32.store (local.get $metrics_out)
+      (select (local.get $black_width) (i32.const 1) (i32.gt_s (local.get $black_width) (i32.const 0))))
+    (i32.store offset=4 (local.get $metrics_out)
+      (select (local.get $black_height) (i32.const 1) (i32.gt_s (local.get $black_height) (i32.const 0))))
     (i32.store offset=8 (local.get $metrics_out)
       (select (local.get $min_x) (i32.const 0) (i32.gt_s (local.get $black_width) (i32.const 0))))
     (i32.store offset=12 (local.get $metrics_out)

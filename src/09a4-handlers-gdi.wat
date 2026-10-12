@@ -1717,6 +1717,19 @@
       (then (local.set $result (call $gdi_glyph_metrics_a
         (local.get $arg0) (local.get $arg1) (local.get $arg2)
         (local.get $metrics_wa)))))
+    (if (local.get $metrics_wa)
+      (then
+        (if (i32.eqz (i32.load (local.get $metrics_wa)))
+          (then (i32.store (local.get $metrics_wa) (i32.const 1))))
+        (if (i32.eqz (i32.load offset=4 (local.get $metrics_wa)))
+          (then (i32.store offset=4 (local.get $metrics_wa) (i32.const 1))))))
+    (if (i32.and (i32.le_s (local.get $result) (i32.const 0))
+          (i32.or (i32.eq (i32.and (local.get $arg2) (i32.const 0x7F)) (i32.const 1))
+                  (i32.eq (i32.and (local.get $arg2) (i32.const 0x7F)) (i32.const 6))))
+      (then
+        (if (i32.and (i32.ne (local.get $buffer_wa) (i32.const 0)) (i32.ge_u (local.get $arg4) (i32.const 4)))
+          (then (i32.store (local.get $buffer_wa) (i32.const 0))))
+        (local.set $result (i32.const 4))))
     (i32.store offset=0 (global.get $reg_base) (local.get $result))
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 32))))
 

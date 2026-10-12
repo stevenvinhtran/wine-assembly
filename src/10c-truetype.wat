@@ -2899,7 +2899,7 @@
   ;; table existed and the last two faces silently failed to open.
   (global $TT_MAX_FACES i32 (i32.const 32))
   (global $TT_FACE_STRIDE i32 (i32.const 32))
-  (global $TT_CACHE_SLOTS i32 (i32.const 1024))
+  (global $TT_CACHE_SLOTS i32 (i32.const 4096))
   (global $TT_CACHE_STRIDE i32 (i32.const 24))
   ;; Widest glyph the shared raster scratch can take. Beyond this the caller
   ;; gets no bitmap rather than a truncated one.
@@ -4483,11 +4483,19 @@
       (then (return (select (i32.const 0x00010000) (i32.const 0)
         (i32.or (i32.eqz (local.get $field))
           (i32.eq (local.get $field) (i32.const 3)))))))
+    (if (i32.and (i32.eqz (i32.load (local.get $mat)))
+                 (i32.eqz (i32.load offset=12 (local.get $mat))))
+      (then (return (select (i32.const 0x00010000) (i32.const 0)
+        (i32.or (i32.eqz (local.get $field))
+          (i32.eq (local.get $field) (i32.const 3)))))))
     (i32.load (i32.add (local.get $mat)
       (i32.shl (local.get $field) (i32.const 2)))))
 
   (func $tt_ggo_matrix_identity (param $mat i32) (result i32)
     (if (i32.eqz (local.get $mat)) (then (return (i32.const 1))))
+    (if (i32.and (i32.eqz (i32.load (local.get $mat)))
+                 (i32.eqz (i32.load offset=12 (local.get $mat))))
+      (then (return (i32.const 1))))
     (i32.and
       (i32.and
         (i32.eq (i32.load (local.get $mat)) (i32.const 0x00010000))
@@ -4880,7 +4888,16 @@
       (i32.ne (i32.and (local.get $format) (i32.const 0x80)) (i32.const 0))))
     (if (i32.ge_u (local.get $gid)
           (call $tt_num_glyphs (local.get $data) (local.get $size)))
-      (then (return (i32.const -1))))
+      (then
+        (if (local.get $metrics)
+          (then
+            (i32.store (local.get $metrics) (i32.const 1))
+            (i32.store offset=4 (local.get $metrics) (i32.const 1))
+            (i32.store offset=8 (local.get $metrics) (i32.const 0))
+            (i32.store offset=12 (local.get $metrics) (i32.const 0))
+            (i32.store16 offset=16 (local.get $metrics) (i32.const 8))
+            (i32.store16 offset=18 (local.get $metrics) (i32.const 0))))
+        (return (i32.const -1))))
     (local.set $scratch (call $tt_raster_scratch))
     (if (i32.eqz (local.get $scratch)) (then (return (i32.const -1))))
     (local.set $points (local.get $scratch))
@@ -4928,8 +4945,10 @@
         (i32.store offset=12 (local.get $metrics)
           (call $tt_ggo_ceil (local.get $max_y))))
       (else
-        (i32.store (local.get $metrics) (i32.const 0))
-        (i32.store offset=4 (local.get $metrics) (i32.const 0))
+        ;; Empty glyph (e.g. space): Win98/Wine returns fake 1x1 BBox in
+        ;; GLYPHMETRICS so callers dividing by gmBlackBoxY never divide by zero.
+        (i32.store (local.get $metrics) (i32.const 1))
+        (i32.store offset=4 (local.get $metrics) (i32.const 1))
         (i32.store offset=8 (local.get $metrics) (i32.const 0))
         (i32.store offset=12 (local.get $metrics) (i32.const 0))))
 
@@ -4954,6 +4973,11 @@
           (local.get $max_y) (local.get $min_y)))
         (i32.store offset=8 (local.get $metrics) (local.get $min_x))
         (i32.store offset=12 (local.get $metrics) (local.get $max_y))))
+    ;; Ensure gmBlackBoxX and gmBlackBoxY are at least 1 (never 0)
+    (if (i32.eqz (i32.load (local.get $metrics)))
+      (then (i32.store (local.get $metrics) (i32.const 1))))
+    (if (i32.eqz (i32.load offset=4 (local.get $metrics)))
+      (then (i32.store offset=4 (local.get $metrics) (i32.const 1))))
     (local.set $advance (if (result i32) (local.get $hinted)
       (then (i32.shl (call $tth_hint_last_advance) (i32.const 10)))
       (else (i32.shl
@@ -4967,7 +4991,16 @@
       (i64.extend_i32_s (local.get $advance_x)) (i64.const 65536)))
     (i32.store16 offset=18 (local.get $metrics) (call $gdi_round_ratio
       (i64.extend_i32_s (local.get $advance_y)) (i64.const 65536)))
-    (if (i32.eqz (local.get $base)) (then (return (i32.const 0))))
+    ;; Empty glyph has no bitmap or contour payload:
+    (if (i32.eqz (local.get $count))
+      (then
+        (if (i32.or (i32.eq (local.get $base) (i32.const 1))
+                    (i32.eq (local.get $base) (i32.const 6)))
+          (then
+            (if (i32.and (i32.ne (local.get $buffer) (i32.const 0)) (i32.ge_u (local.get $buffer_size) (i32.const 4)))
+              (then (i32.store (local.get $buffer) (i32.const 0))))
+            (return (i32.const 4))))
+        (return (i32.const 0))))
 
     (if (i32.eq (local.get $base) (i32.const 1))
       (then

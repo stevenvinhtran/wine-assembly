@@ -2231,6 +2231,7 @@
     (local $chunk i32) (local $base i32) (local $record i32)
     (local $cur i32) (local $prev_w i32) (local $size i32) (local $steps i32)
     (local $best i32) (local $best_size i32) (local $best_prev_w i32)
+    (local $any_fit i32) (local $any_fit_size i32) (local $any_fit_prev_w i32)
     (local.set $chunk
       (i32.and (i32.add (local.get $need) (i32.const 0xFFF)) (i32.const 0xFFFFF000)))
     (if (i32.lt_u (local.get $chunk) (local.get $need)) (then (return (i32.const 0))))
@@ -2250,17 +2251,23 @@
             (else (global.set $heap_large_free (i32.const 0))))
           (br $scanned)))
       (local.set $size (i32.load (call $g2w (local.get $cur))))
-      (if (i32.and
-            (i32.ge_u (local.get $size) (local.get $chunk))
-            (i32.and
-              (i32.le_u (local.get $size)
-                (i32.add (local.get $chunk) (i32.shr_u (local.get $chunk) (i32.const 1))))
-              (i32.or (i32.eqz (local.get $best))
-                (i32.lt_u (local.get $size) (local.get $best_size)))))
+      (if (i32.ge_u (local.get $size) (local.get $chunk))
         (then
-          (local.set $best (local.get $cur))
-          (local.set $best_size (local.get $size))
-          (local.set $best_prev_w (local.get $prev_w))))
+          (if (i32.or (i32.eqz (local.get $any_fit))
+                (i32.lt_u (local.get $size) (local.get $any_fit_size)))
+            (then
+              (local.set $any_fit (local.get $cur))
+              (local.set $any_fit_size (local.get $size))
+              (local.set $any_fit_prev_w (local.get $prev_w))))
+          (if (i32.and
+                (i32.le_u (local.get $size)
+                  (i32.add (local.get $chunk) (i32.shr_u (local.get $chunk) (i32.const 1))))
+                (i32.or (i32.eqz (local.get $best))
+                  (i32.lt_u (local.get $size) (local.get $best_size))))
+            (then
+              (local.set $best (local.get $cur))
+              (local.set $best_size (local.get $size))
+              (local.set $best_prev_w (local.get $prev_w))))))
       (local.set $prev_w (call $g2w (local.get $cur)))
       (local.set $cur (i32.load offset=4 (local.get $prev_w)))
       (br $scan)))
@@ -2281,12 +2288,37 @@
       (then
         (if (call $heap_arena_release_free)
           (then (local.set $base (call $virtual_reserve_down (local.get $chunk)))))))
-    (if (i32.eqz (local.get $base)) (then (return (i32.const 0))))
+    (if (i32.eqz (local.get $base))
+      (then
+        (if (local.get $any_fit)
+          (then
+            (if (local.get $any_fit_prev_w)
+              (then (i32.store offset=4 (local.get $any_fit_prev_w)
+                (i32.load offset=4 (call $g2w (local.get $any_fit)))))
+              (else (global.set $heap_large_free
+                (i32.load offset=4 (call $g2w (local.get $any_fit))))))
+            (call $heap_arena_charge (call $heap_arena_find (local.get $any_fit)) (local.get $any_fit_size))
+            (call $guest_memset (i32.add (local.get $any_fit) (i32.const 4)) (i32.const 0)
+              (i32.sub (local.get $any_fit_size) (i32.const 4)))
+            (return (local.get $any_fit))))
+        (return (i32.const 0))))
     (if (i32.eqz (call $virtual_map_commit (local.get $base) (local.get $chunk)))
       (then
         (drop (call $heap_arena_release_free))
         (if (i32.eqz (call $virtual_map_commit (local.get $base) (local.get $chunk)))
-          (then (return (i32.const 0))))))
+          (then
+            (if (local.get $any_fit)
+              (then
+                (if (local.get $any_fit_prev_w)
+                  (then (i32.store offset=4 (local.get $any_fit_prev_w)
+                    (i32.load offset=4 (call $g2w (local.get $any_fit)))))
+                  (else (global.set $heap_large_free
+                    (i32.load offset=4 (call $g2w (local.get $any_fit))))))
+                (call $heap_arena_charge (call $heap_arena_find (local.get $any_fit)) (local.get $any_fit_size))
+                (call $guest_memset (i32.add (local.get $any_fit) (i32.const 4)) (i32.const 0)
+                  (i32.sub (local.get $any_fit_size) (i32.const 4)))
+                (return (local.get $any_fit))))
+            (return (i32.const 0))))))
     (local.set $record (call $heap_arena_register
       (local.get $base) (i32.add (local.get $base) (local.get $chunk))))
     (if (i32.eqz (local.get $record))
@@ -8336,7 +8368,9 @@
                   (i32.eq
                     (i32.or (i32.load offset=4 (local.get $class_wa)) (i32.const 0x20202020))
                     (i32.const 0x6f636261)))) ;; "abco"
-            (then (local.set $native_tab (i32.const 1))))
+            (then
+              (local.set $native_tab (i32.const 1))
+              (local.set $class_enum (i32.const 27))))
           (if (i32.and
                 (i32.eqz (local.get $class_enum))
                 (i32.ne (local.get $class_ptr) (i32.const 0)))

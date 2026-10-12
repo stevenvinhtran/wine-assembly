@@ -2736,18 +2736,13 @@
     ;; messages, but WAT mirrors input/state and owns their shared-surface paint.
     (if (call $tab_native_is (call $gl32 (local.get $arg0)))
       (then
-        (call $tab_native_note_message
+        (i32.store offset=0 (global.get $reg_base) (call $tab_wndproc
           (call $gl32 (local.get $arg0))
           (call $gl32 (i32.add (local.get $arg0) (i32.const 4)))
           (call $gl32 (i32.add (local.get $arg0) (i32.const 8)))
-          (call $gl32 (i32.add (local.get $arg0) (i32.const 12))))
-        (if (i32.eq (call $gl32 (i32.add (local.get $arg0) (i32.const 4))) (i32.const 0x000F))
-          (then
-            (call $update_clear_hwnd (call $gl32 (local.get $arg0)))
-            (call $paint_flag_clear_hwnd (call $gl32 (local.get $arg0)))
-            (i32.store offset=0 (global.get $reg_base) (call $tab_native_paint (call $gl32 (local.get $arg0))))
-            (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 8)))
-            (return)))))
+          (call $gl32 (i32.add (local.get $arg0) (i32.const 12)))))
+        (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 8)))
+        (return)))
     ;; Registered status bars keep their guest wndproc for layout and normal
     ;; messages, but paint through WAT so their shared parent surface cannot
     ;; expose stale view/scrollbar pixels.
@@ -4101,13 +4096,10 @@
     (local.set $ctrl_class (call $ctrl_table_get_class (local.get $arg0)))
     (if (call $tab_native_is (local.get $arg0))
       (then
-        (call $tab_native_note_message
-          (local.get $arg0) (local.get $arg1) (local.get $arg2) (local.get $arg3))
-        (if (i32.eq (local.get $arg1) (i32.const 0x000F))
-          (then
-            (i32.store offset=0 (global.get $reg_base) (call $tab_native_paint (local.get $arg0)))
-            (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
-            (return)))))
+        (i32.store offset=0 (global.get $reg_base) (call $tab_wndproc
+          (local.get $arg0) (local.get $arg1) (local.get $arg2) (local.get $arg3)))
+        (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
+        (return)))
     (if (i32.and (call $statusbar_native_is (local.get $arg0))
                  (i32.eq (local.get $arg1) (i32.const 0x000F)))
       (then
