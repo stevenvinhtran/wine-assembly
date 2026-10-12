@@ -5120,7 +5120,7 @@ class WineAssembly {
     const wait = {token,done:false}; this._d3dMainWait = wait;
     wait.promise = Promise.resolve().then(() => this.hostCtx.waitD3DRender(token))
       .catch(error => this.logToUI(`[render] ${error && error.message}`))
-      .then(() => { wait.done = true; });
+      .then(() => { wait.done = true; this._wakeStep(); });
     return wait;
   }
 
@@ -6398,6 +6398,8 @@ class WineAssembly {
       // -1 is "this thread owns no timer at all": nothing but an external
       // event can wake it, and those wake us explicitly.
       if (due >= 0) best = Math.min(best, due);
+    } else if (yr === 16) {
+      best = Math.min(best, 16);
     } else if (!tm || !tm._mainSleepUntil) {
       // Parked for a reason we do not model. Poll at the cap.
       best = Math.min(best, WineAssembly.MAX_PARK_SLEEP_MS);
