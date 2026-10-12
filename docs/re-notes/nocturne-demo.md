@@ -116,3 +116,29 @@ Enter press misses state polling, stays on Start; held300ms resolves. Original
 touch code already has minimum key hold for polled games, so no speculative
 input-engine patch added. All evidence collected. Result published only for
 1033Z reviewed gameplay; main integration remains ops-owned.
+
+## 2026-10-12 10:50Z — Actual touch gameplay verified
+
+1046Z-nocturne-touch-prepared, bx_qbqexdmu, Chrome155,844x390 mobile touch
+emulation, exact5e8f1716 module. CDP actual touch only for startup/menu/play:
+Continue sends char32 (held Fire only emits key state); Confirm stays held
+for the touch duration. Pad300ms steps select Chapter6; Up4s visibly walks;
+Draw weapon and Fire/use2s shows muzzle flash. Reviewed chapter/before/moved/
+action and all controls visible. Fix7e3ca695a on codex/dr2-registration.
+Physical devices/Safari, jump and menu return not qualified by this run.
+
+Separate keyboard F11 held2s produces no obvious brightening. Readme confirms
+F11/F12 gamma controls, but one adjustment is not proof of a gamma defect.
+Next repeated discrete F11 inputs plus existing gamma API tracing; no shader
+or API patch without that evidence. WinePerf snapshot all zeros because the
+probe did not enable collection (default disabled); not zero game FPS. Next
+call WinePerf.start({draw:false}) before sampling; distinguish presentations
+from logical frames. Audio remains untested.
+
+Fork preflight must ALWAYS copy preserved original fixture to registered game/,
+prepare candidate manifest, rebuild/check wasm hash, install Chrome.1042Z
+HTTP409 was missing test/binaries/candidates/nocturne-demo on fork; initial
+prepare failed same missing directory, copy from original extraction fixed
+it (prepare-fixed.log). Earlier build absence similarly excluded generated
+files. These are test setup failures, not guest compatibility regressions.
+All successful run artifacts collected; evidence containment check clean.
