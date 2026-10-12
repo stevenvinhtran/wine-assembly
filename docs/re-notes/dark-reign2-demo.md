@@ -525,3 +525,43 @@ This does not enable OVERLAPPED creation: the exact DR2 flags=1 call still
 fails fast at that capability check, now after successful transport validation.
 No ordinary replay or gameplay claim. Evidence:
 scratch/runs/20261012T0033Z-dark-reign2-raw-allocation/.
+
+### OVERLAPPED implementation audit (2026-10-12)
+
+The remaining creation gate is in `$vsock_wsasocket`: after successful
+transport validation, any nonzero accepted flags call `$crash_unimplemented`.
+The DR2 request is flags=1. Creating a socket and submitting an asynchronous
+operation are separate steps; the next implementation should retain the
+creation attribute and explicitly distinguish supported operation modes,
+rather than changing that check into untracked success.
+
+Existing infrastructure inspected:
+
+- `$iocp_complete_overlapped` in `09a7-handlers-dispatch.wat` only completes
+  handles already associated with an IOCP. It writes Internal/InternalHigh
+  and queues a port entry; it does not maintain pending socket receives or
+  signal an OVERLAPPED event when no port is associated. It cannot simply
+  replace the socket handlers' current fail-fast branches.
+- `socket_event` in `lib/host-imports.js` serializes FD notification records
+  through the host/RPC boundary. Those records belong to WSAEventSelect and
+  must remain separate from per-operation OVERLAPPED completion.
+- Socket flags currently use bits0..5. Any creation attribute added there
+  must survive connect retry/reset and accept inheritance, and clear on
+  destruction/reuse. Socket creation alone must not signal completion.
+- `WSAGetOverlappedResult` is absent from this branch's API table. Add it
+  append-only if the implemented completion route needs it; do not reuse a
+  stale numeric API id from these notes.
+
+The next runtime-backed slice needs an explicit operation lifetime: validated
+guest OVERLAPPED/output spans, immediate completion versus queued receive,
+bounded pending records shared across guest threads, exactly-once delivery,
+event/IOCP publication after output writes, and cancellation on socket close.
+Unsupported completion-routine modes must still fail fast. Tests must cover
+empty receive followed by arrival, immediate receive/send, invalid pointers,
+close/reuse, two threads observing one completion, and no duplicate delivery
+after retry. Preserve the original synchronous tests as controls.
+
+No async implementation or runtime result is claimed by this audit. Runtime
+is currently handed to launch-ux for Oni's first-level input diagnosis on
+bx_y429vzbh; the DR2 source worktree remains clean after this documentation
+commit, ready for the next tested implementation slice.
