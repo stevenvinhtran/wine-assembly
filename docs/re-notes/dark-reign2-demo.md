@@ -603,3 +603,32 @@ Compare guest mission name and screenshot; missions/system/shell is only
 the menu world. If needed, inspect the game's polling path or use ordinary
 browser pointer input. Do not change emulator semantics merely to make a
 zero-duration synthetic click succeed.
+
+### Held-input control result (2026-10-12)
+
+The prepared replay completed 2130 batches in 60s without a trap. Reviewed
+before-press.png shows the ready menu; held-final.png shows the difficulty
+dropdown opened with the game's cursor still near (320,240). Thus button
+input did register, but the absolute target (320,320) did not move the game's
+cursor to Load Mission. This narrows the problem to the test route; it does
+not establish broken game input. Next control uses relative movement (0,80)
+and a held DirectInput button. The original zero-duration click remains a
+separate pulse-duration concern. No gameplay/FPS qualification yet.
+
+The relative-input control succeeded: at580 relmousemove(0,80), button1 down
+at600/up610 loaded missions/demo/Demo Mission 1 and reached Sim. The 60s
+run completed2900 batches without a trap. Reviewed relative-final.png shows
+terrain, friendly units, the objective 'Eliminate Rumblers and Sky Sweeper
+tower', and the RTS HUD. This establishes mission launch, not yet a verified
+unit order or gameplay FPS. All captures/logs remain in the same evidence run.
+
+Box-selection replay: after the same mission launch, relative(-40,-120) at1950,
+button1 down1960, relative(120,190) over10 batches from2000, up2020 selects
+seven visible units: control-selected.png shows selection brackets, health
+bars and Guard/Explore controls absent in control-before.png. This is ordinary
+player input in the mission. Relative(-200,-150) then button2 down2110/up2120
+clears selection; control-final.png shows no observed unit displacement. Do not
+call that a successful move order. Next verify the game's command binding
+(left contextual click versus right cancel), then capture movement and FPS.
+The bounded replay completed2900 batches in57.949s without a trap. No FPS
+inference from batches/s. Evidence control-*.png/log in the same run folder.
