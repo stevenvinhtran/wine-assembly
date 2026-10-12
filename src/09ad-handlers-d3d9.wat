@@ -599,8 +599,28 @@
   ;; ── IDirect3D9 — 17 methods ─────────────
   ;; IDirect3D9_QueryInterface — 3 args (incl. this)
   (func $handle_IDirect3D9_QueryInterface (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
-    (call $crash_unimplemented (local.get $name_ptr))
-    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16))))
+    (local $iid i32) (local $lo i64) (local $hi i64) (local $match i32)
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16)))
+    (if (i32.eqz (local.get $arg2))
+      (then (i32.store offset=0 (global.get $reg_base) (i32.const 0x80004003)) (return)))
+    (call $gs32 (local.get $arg2) (i32.const 0))
+    (if (i32.eqz (local.get $arg1))
+      (then (i32.store offset=0 (global.get $reg_base) (i32.const 0x80004003)) (return)))
+    (local.set $iid (call $g2w (local.get $arg1)))
+    (local.set $lo (i64.load (local.get $iid)))
+    (local.set $hi (i64.load offset=8 (local.get $iid)))
+    (local.set $match (i32.or
+      ;; IUnknown: {00000000-0000-0000-C000-000000000046}
+      (i32.and (i64.eq (local.get $lo) (i64.const 0)) (i64.eq (local.get $hi) (i64.const 0x46000000000000c0)))
+      ;; IDirect3D9: {81bdcbca-64d4-426d-ae8d-ad0147f4275c}
+      (i32.and (i64.eq (local.get $lo) (i64.const 0x426d64d481bdcbca)) (i64.eq (local.get $hi) (i64.const 0x5c27f44701ad8dae)))))
+    (if (local.get $match)
+      (then
+        (drop (call $dx_com_addref (local.get $arg0)))
+        (call $gs32 (local.get $arg2) (local.get $arg0))
+        (i32.store offset=0 (global.get $reg_base) (i32.const 0)))
+      (else
+        (i32.store offset=0 (global.get $reg_base) (i32.const 0x80004002)))))
 
   ;; IDirect3D9_RegisterSoftwareDevice — 2 args (incl. this)
   (func $handle_IDirect3D9_RegisterSoftwareDevice (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
@@ -908,12 +928,10 @@
       (i32.store offset=184 (local.get $wa) (i32.const 0x00ffffff))
       (i32.store offset=188 (local.get $wa) (i32.const 1))
       (i32.store offset=192 (local.get $wa) (i32.const 255))
-      (i32.store offset=196 (local.get $wa) (i32.const 0xfffe0101))
-      (i32.store offset=200 (local.get $wa) (i32.const 96))
-      ;; PixelShaderVersion: ps_1_1..1_4 compile publicly ($d3d_ir_scan14 for
-      ;; 1.4, six samplers in both backends). MaxSimultaneousTextures (+152)
-      ;; stays 4: it also bounds fixed-function multitexturing.
-      (i32.store offset=204 (local.get $wa) (i32.const 0xffff0104))
+      (i32.store offset=196 (local.get $wa) (i32.const 0xfffe0300))
+      (i32.store offset=200 (local.get $wa) (i32.const 256))
+      ;; PixelShaderVersion: ps_3_0
+      (i32.store offset=204 (local.get $wa) (i32.const 0xffff0300))
       (f32.store offset=208 (local.get $wa) (f32.const 8))))
     (call $guest_span_writeback (local.get $dest) (local.get $wa) (i32.const 304))
     (i32.const 0))
@@ -1102,8 +1120,28 @@
   ;; ── IDirect3DDevice9 — 119 methods ─────────────
   ;; IDirect3DDevice9_QueryInterface — 3 args (incl. this)
   (func $handle_IDirect3DDevice9_QueryInterface (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
-    (call $crash_unimplemented (local.get $name_ptr))
-    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16))))
+    (local $iid i32) (local $lo i64) (local $hi i64) (local $match i32)
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16)))
+    (if (i32.eqz (local.get $arg2))
+      (then (i32.store offset=0 (global.get $reg_base) (i32.const 0x80004003)) (return)))
+    (call $gs32 (local.get $arg2) (i32.const 0))
+    (if (i32.eqz (local.get $arg1))
+      (then (i32.store offset=0 (global.get $reg_base) (i32.const 0x80004003)) (return)))
+    (local.set $iid (call $g2w (local.get $arg1)))
+    (local.set $lo (i64.load (local.get $iid)))
+    (local.set $hi (i64.load offset=8 (local.get $iid)))
+    (local.set $match (i32.or
+      ;; IUnknown: {00000000-0000-0000-C000-000000000046}
+      (i32.and (i64.eq (local.get $lo) (i64.const 0)) (i64.eq (local.get $hi) (i64.const 0x46000000000000c0)))
+      ;; IDirect3DDevice9: {D0223B96-BF7A-43fd-92BD-A43B0D82B9EB}
+      (i32.and (i64.eq (local.get $lo) (i64.const 0x43fdbf7ad0223b96)) (i64.eq (local.get $hi) (i64.const 0xebb9820d3ba4bd92)))))
+    (if (local.get $match)
+      (then
+        (drop (call $dx_com_addref (local.get $arg0)))
+        (call $gs32 (local.get $arg2) (local.get $arg0))
+        (i32.store offset=0 (global.get $reg_base) (i32.const 0)))
+      (else
+        (i32.store offset=0 (global.get $reg_base) (i32.const 0x80004002)))))
 
   ;; IDirect3DDevice9_Release — 1 args (incl. this)
   (func $handle_IDirect3DDevice9_Release (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
@@ -1368,6 +1406,14 @@
       (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 28)))
       (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 32))))
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 40))))
+
+  ;; D3DXCreateTexture — 8 args: (pDevice, Width, Height, MipLevels, Usage, Format, Pool, ppTexture)
+  (func $handle_D3DXCreateTexture (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (call $d3d9_texture_create (local.get $arg0) (local.get $arg1) (local.get $arg2) (local.get $arg3) (local.get $arg4)
+      (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24)))
+      (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 28)))
+      (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 32))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 36))))
 
   ;; IDirect3DDevice9_CreateVolumeTexture — 10 args (incl. this):
   ;; (this, Width, Height, Depth, Levels, Usage, Format, Pool, ppVolume, pShared)

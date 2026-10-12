@@ -25,7 +25,8 @@ const { bootRenderHarness } = require('./render-helper');
 
 const ARGB4444 = 26;      // D3DFMT_A4R4G4B4
 const A8R8G8B8 = 21;
-const UNSUPPORTED = 28;   // D3DFMT_A8 -- nothing stores it today
+const FMT_A8 = 28;        // D3DFMT_A8
+const UNSUPPORTED = 41;   // D3DFMT_P8 -- paletted format not stored directly
 const D3DERR_NOTAVAILABLE = 0x8876086A;
 const D3DERR_INVALIDCALL = 0x8876086C;
 
@@ -103,6 +104,7 @@ const D3DERR_INVALIDCALL = 0x8876086C;
   //    way. A yes here that CreateTexture then refuses is the shape of the bug.
   assert.strictEqual(e.check_format(0, 3, ARGB4444) >>> 0, 0, 'plain texture A4R4G4B4 is available');
   assert.strictEqual(e.check_format(0, 3, A8R8G8B8) >>> 0, 0);
+  assert.strictEqual(e.check_format(0, 3, FMT_A8) >>> 0, 0, 'plain texture A8 is available');
   assert.strictEqual(e.check_format(0, 3, UNSUPPORTED) >>> 0, D3DERR_NOTAVAILABLE,
     'a format we do not store is still refused');
 

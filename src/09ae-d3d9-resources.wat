@@ -1714,7 +1714,9 @@
   ;; L8 is one, A8L8 and L16 are two; everything else we store is four. The
   ;; 16-bit colour family (A4R4G4B4) is two as well.
   (func $d3d9_texture_texel_bytes (param $format i32) (result i32)
-    (if (i32.eq (local.get $format) (i32.const 50)) (then (return (i32.const 1))))
+    (if (i32.or (i32.or (i32.eq (local.get $format) (i32.const 50))
+                        (i32.eq (local.get $format) (i32.const 28)))
+                (i32.eq (local.get $format) (i32.const 41))) (then (return (i32.const 1))))
     (if (i32.or (i32.or (i32.eq (local.get $format) (i32.const 23))
                         (i32.eq (local.get $format) (i32.const 51)))
                 (i32.or (i32.or (i32.eq (local.get $format) (i32.const 81))
@@ -1746,7 +1748,9 @@
       (i32.or
         (i32.or (i32.or (i32.eq (local.get $format) (i32.const 50))
                         (i32.eq (local.get $format) (i32.const 51)))
-                (i32.eq (local.get $format) (i32.const 26)))
+                (i32.or (i32.or (i32.eq (local.get $format) (i32.const 26))
+                                (i32.eq (local.get $format) (i32.const 28)))
+                        (i32.eq (local.get $format) (i32.const 41))))
         (i32.or (i32.or (i32.eq (local.get $format) (i32.const 62))
                         (i32.eq (local.get $format) (i32.const 81)))
                 (i32.or (i32.eq (local.get $format) (i32.const 24))
