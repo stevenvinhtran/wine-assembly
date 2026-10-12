@@ -10,8 +10,8 @@ Not in current corpus/public registry or existing task list when selected.
 ## Source preflight 2026-10-12 07:06Z
 
 Evidence scratch/runs/20261012T0706Z-thief2-preflight/. Standard endpoint
-initially appeared stalled. A mirror retry overlapped the original completion
-and overwrote the full file with partial bytes. Original download.json and
+initially appeared stalled. The original completed at07:10:51Z after the last status check. An unchecked
+mirror retry started at07:11:03Z and overwrote that full file with partial bytes. Original download.json and
 listing.txt record the earlier complete download, not current payload validity.
 Current-payload.json is authoritative:59440936 bytes, SHA1
 0ea8dbb7247fa7c4a022eb846dc06cee4e72d660, NOT the required complete hash.
