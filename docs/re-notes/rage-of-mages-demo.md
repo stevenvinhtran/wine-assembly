@@ -107,3 +107,32 @@ Reviewed selected/final images, commands and logs are preserved; no guest
 state edits. Bounded25000-batch replay exits0. Next local-only registration
 and browser/touch route, then audio and scene-qualified FPS. CLI batches/s
 are not FPS; no release approval or public asset distribution is implied.
+
+## Local registration and Chromium touch gameplay (2026-10-12 04:05 UTC)
+
+Registration `9bdf532e4` on `codex/dr2-registration` adds local candidate
+`rage-of-mages-demo`, app `rage_of_mages_demo`, and direct touch with an Esc
+button/keyboard affordance. It does not add the game to DESKTOP_APPS.
+The manifest uses explicit manual placement of the verified installer into
+`archive/ROMDEMO.EXE`, then existing `extractArchive` preparation into `game`.
+Archive entry-download URLs respond HTTP200 with zero bytes on both data
+servers; hash checks reject them. No working one-click download is claimed.
+The full disc SHA1 is `cc199d8dc56fc2636843d625a724f9e21467f483` per Archive
+metadata. Installer SHA1 is `46b0dbb02e6eafa6eaf9c334c635f9744546f094`.
+Prepared14files and game EXE hash match the verified CLI fixture.
+
+`20261012T0401Z-rage-of-mages-browser`: fresh remote build and Chrome155,
+same module9e835f75..8cd6. Registered entry reaches menu. Actual Chromium
+touchscreen taps open New Game, advance all six opening dialogue prompts,
+close the tip and select the wizard. Step3 has her at screen(257,545);
+step4 after a tap(350,550) has her visibly displaced near(355,545), while the
+other character and terrain landmarks remain fixed. This is browser gameplay.
+Viewport844x390 then shows the entire game with side gutters and visible Esc/
+keyboard controls. Step6 after tap(390,260) moves her from about(435,260) to
+(385,260), confirming touch input still maps correctly at that layout.
+
+Menu/step1..6, exact probe/command JSON, run log, stage and module/browser
+identity are preserved. Stage complete04:05:44, browser/server finally closed.
+This is desktop Chromium touch emulation, not Safari or a physical phone.
+Audio quality, scene-qualified FPS and broader combat/save/load remain open.
+Core compatibility is ready for ops review; registration is not on main yet.
