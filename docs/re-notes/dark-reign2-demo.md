@@ -879,3 +879,18 @@ CLI post-order observation interval before another timing claim.
 
 Boat exec transport returned ECONNREFUSED but process kept running. Verified
 complete artifact and collected results before cleanup; no rerun/duplicate.
+
+### Matched observation interval (2026-10-12 10:13Z)
+
+1002Z-dr2-long-observation restores pre-FMUL source and verifies exact0753Z
+module6b6d56337acd65b64de5c2192efed64df64562f3865e602ccbb809a44be18ab1.
+Build/prepare PASS (installer archive restored after first prepare failure).
+Chrome155, Normal, original selection/order. Extends post-order wait to156s
+matching CLI order2120->2900 at200ms/batch. Reviewed selected/after156:
+units remain in formation, ground marker visible. Simulation1508->3073;
+guest tick205931->362567 (156.636s), pause0/networkmode0 throughout.
+Thus waiting longer at this interval does not recover browser movement.
+No new input-queue, pause or difficulty test needed. Next compare ordinary
+command acceptance/selection ownership using runtime/API evidence, not
+new guest disassembly. All evidence collected from bx_vhk6nrm7 before
+restoring Nocturne FMUL build. Main0304 still unchanged; ops integration.

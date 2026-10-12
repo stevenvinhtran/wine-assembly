@@ -65,3 +65,32 @@ replaying calibration; no hand-written bypass. All runs use same module
 CLI run0954Z ends normally50000batches104.217s; no FPS inference.
 Old workers unchanged/completed; no new receipts. DR2 queued semantic
 command/selection comparison remains, no new conclusion from these tests.
+
+## 2026-10-12 10:05Z — Chapter6 world loads
+
+1001Z on bx_vhk6nrm7 selects Chapter6 via five Down keys42000..46000,
+then Enter47000/47001. selected.png reviewed correct Crescent Theater.
+Final55692batches/180.013s shows dark 320x320 rendered scene and character;
+no crash. This is world entry, NOT yet player-control verification.
+Next baseline checkpoint after scene load, ordinary Up movement/turn and
+D draw/Space fire; use original F11 gamma key if visibility needs it.
+All evidence collected before switching remote source back to pre-FMUL
+DR2 control; reapply462848051 for any exact Nocturne module replay.
+
+## 2026-10-12 10:19Z — Ordinary walking verified
+
+1015Z-nocturne-movement on bx_vhk6nrm7 rebuilds exact5e8f1716...69a.
+Same startup/chapter route. Before56000 and moved62500 reviewed: held
+Up58000->62000 moves character from left toward doorway. CLI ordinary
+walking is verified; final screenshot alone is not used as proof. F11
+keydown56500/57000 produces no clear brightening; scene remains very dark.
+Stops normally at63083batches/270.014s, status0; right-turn keydown63000
+just begins. Planned draw65000/fire66000/action69000 never execute.
+action.png is absent because its batch was never reached, not lost evidence.
+No weapon, audio or FPS claim. Build/command/environment/exit/log and
+selected/before/bright/moved/final collected. Initial restore transfer hit
+argument-size limit and scp API denied; chunked exec transfer succeeded,
+module hash verified before sole CLI run. No gameplay repeat for transfer.
+Next register local-only nocturne_demo route and validate ordinary browser
+walking, original brightness/calibration UX and weapon use. Source assets
+remain remote, local test/binaries/candidates/nocturne-demo/game absent.
