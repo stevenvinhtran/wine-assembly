@@ -86,3 +86,4 @@ sitemap.xml
 
 # Private installed DOS payloads; manifests alone are versioned.
 test/binaries/toyvm-installed/
+*.zip
