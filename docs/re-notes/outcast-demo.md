@@ -87,3 +87,32 @@ No emulator source fix. Next local-only registration with reproducible launcher
 configuration/handoff, browser arrow-key and touch movement, scene-qualified FPS
 and audio. Do not use batches/s as FPS. No browser/phone/audio qualification yet.
 Original menu/child warnings and failed harness attempts remain in evidence.
+
+
+## Stock configuration and local registry, 2026-10-12 05:00Z
+
+0456Z-outcast-stock verifies direct OC2.EXE --args=game against the original
+flattened EXE/PAK files (not captured launcher settings): reviewed400x300 world
+rendering,4000batches/26.06seconds, exit0. A direct registry entry therefore need
+not depend on prior generated configuration. Prepare copies134 original files
+from that flat tree; browser manifest supplies133 data files beside OC2.EXE.
+Local-only outcast_demo/outcast-demo registration uses that direct route with
+relative mouse and arrow-key touch pad; Use/fire, Aim, Weapon1, MapTab, MenuEsc.
+Manual source preparation and exact executable SHA256 are in the manifest.
+
+0458Z-outcast-browser: Chrome155/WebGL/Threads with the registered stock route.
+First capture at60seconds is still loading, step1 keyboard also during loading;
+step3 shows the rendered world with Cutter in water after touch-pad input. Full
+844x390 layout visible. This run proves browser launch, but lacks a before-world
+movement baseline; use the following later-input run for input qualification.
+
+
+0500Z-outcast-browser-input starts input after100seconds, with reviewed world
+baseline. Holding ArrowDown4seconds moves Cutter well away from the dock onto
+land (menu.png vs step1.png). At844x390, actual CDP touch-pad forward4seconds
+moves him back to the dock (step2.png vs step3.png). Chrome155/WebGL/Threads,
+module9e835f75..8cd6; stage complete05:01:55, browser/server closed normally.
+This verifies registered keyboard and touch-pad gameplay; it is Chromium touch
+emulation, not physical phone or Safari qualification. Audio, FPS, aiming/fire,
+menu/map and longer exploration remain separate checks. Local-only registration
+e11417836 pushed on codex/dr2-registration; main integration remains ops-owned.
