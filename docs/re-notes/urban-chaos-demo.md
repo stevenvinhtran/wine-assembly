@@ -76,3 +76,38 @@ batch), then reviewed displacement/control comparison. Registration, browser,
 touch, audio/FPS remain unqualified. No known missing payload after full1122-file
 layout; config is reconstructed from installer strings and successful behavior,
 not a captured completed installation. No source/emulator/binary changes.
+
+
+## 2026-10-12 05:37Z live HUD-gated movement
+
+Evidence scratch/runs/20261012T0537Z-urban-chaos-live. Same module/executable
+hashes as above; remote build passed. CLI --control=8123 --frozen reaches batch
+2370 using the documented menu route. Reviewed before.png shows D'arci on the
+street with radar/health and3:58 timer. Only after reviewing that capture, queued
+keydown38, stepped110 batches, queued keyup38 and stepped10 more. after-up.png
+shows D'arci running into the car park past the alley, timer3:56: ordinary player
+movement verified. Control replies confirm batches2370->2490; explicit quit exits0.
+Frozen stepping is a diagnostic route, not a browser performance measurement.
+The module was available when the runner loaded it; build finished shortly after
+runner launch. The recorded post-build hash matches prior tested module9e835f75.
+
+Added local-only urban_chaos_demo / urban-chaos-demo registration on the separate
+codex/dr2-registration branch. Remote --prepare passes1121 data files, including
+config.ini; executable is separate. Initial preparation used the wrong fixture
+root demo-installers and failed clearly; corrected root is test/binaries/candidates.
+Static syntax/manifest/local-only checks pass. Browser launch/touch and audio/FPS
+are still pending; no public desktop entry or deployment.
+
+Exact reconstructed config.ini (Windows path separator):
+
+```ini
+[Game]
+language=text\lang_english.txt
+[LocalInstall]
+textures=1
+sfx=1
+speech=1
+movies=1
+[TextureClumps]
+enable_clumps=1
+```
