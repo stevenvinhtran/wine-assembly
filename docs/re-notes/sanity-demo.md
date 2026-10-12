@@ -92,3 +92,30 @@ iterations, so its overwritten stack is NOT a trustworthy CW observation.
 Numerical JSON, relevant client disassembly and pixel receipts are named
 artifacts in0828Z-sanity-pixel. All captures remain investigation-only until
 a corpus registration exists. No new gameplay, audio or FPS claim.
+
+## Native precision reference and causal diagnostic, 08:35Z
+
+0833Z-sanity-precision adds a READ-ONLY get_fpu_cw export and extends existing
+TRACE-AT formatting on the remote build only. CW at table-store return0040cc9d
+is003f: PC=24-bit, RC=nearest. Matched native x86 inline-assembly executes
+FILD qword31; FMUL f32(255); FMUL f32(1/31); switches RC totruncate for FISTP.
+Native results: CW003f/007f=>255, CW027f/037f=>254. Source/native.txt retained.
+Thus ignored PC causes a confirmed arithmetic mismatch, not missing game data.
+
+0835Z-sanity-mul24 is a deliberately INCOMPLETE diagnostic: wrap FMUL in
+fpu_arith with f32 demote/promote when PC=00. Default optimized run still
+fails Interface Manager (optimized x87 memory multiply bypasses helper).
+0836Z-sanity-mul24-scalar uses same variant plus --no-uop --no-x87-fusion:
+lookup[31]=255 and reviewed final.png shows Sanity main menu. No gameplay.
+Variant build logs, module hashes, commands and diagnostic-change.json retained.
+The variant is NOT a production fix: f32 demotion wrongly narrows exponent
+range, ignores directed rounding and misses optimized/register arithmetic.
+No guest/table/asset patch, no source pushed except investigation notes.
+
+Next implement tested generic x87 PC24 arithmetic with exponent-safe rounding,
+correct rounding controls and interpreter/fused/uop parity; scope optimized
+paths carefully and validate the exact31*255*(1/31f) native reproducer.
+Then ordinary-input gameplay/browser validation, local-only registration.
+Remote bx_npc237ek retains diagnostic code; original baseline06-fpu.wat in
+/home/user/sanity-mul24/original-fpu.wat. Restore that and remove read-only
+export/TRACE-AT addition before treating later module as baseline.
