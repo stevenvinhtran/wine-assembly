@@ -110,3 +110,41 @@ texture coordinates through the appropriate GL state/encoder/backend path,
 with projective-coordinate tests; retain fail-fast behavior until implemented.
 No level screenshot/player control qualification. Audio also remains unverified
 (browser logs report suspended AudioContext).
+
+## Ordinary Load Game route (2026-10-12)
+
+Root resumed the limit-blocked worker's preserved `/home/user/oni-wt` on
+bx_n47sae4r after restoring missing stdole2.tlb. Built module SHA256
+36029bde5328648e01f74b124c984c676745986acd47df945ca9a078b3bb26ef,
+checkout HEAD09277c7c2 (software fog fix). No source change for this replay.
+CLI software GL, unchanged legacy fixture `/home/user/oni-demo-preflight/game`.
+Click320,240 at5400 batches skips intro; click440,310 at7000 opens Load Game.
+At12000 batches the reviewed menu lists TCTF Training and Syndicate Warehouse.
+Normal level selection is available without modifying guest scripts or saves.
+Evidence `20261012T0147Z-oni-loadgame`.
+
+Harness caveat: root initially used `keypress:Escape` / `keypress:Space`,
+but this CLI expects numeric key codes. Do not attribute the successful menu
+route to those invalid actions. Use27/32 and87 for W in subsequent controls.
+
+Select Syndicate Warehouse at240,59 at8500, then Load185,445 at9000.
+The60000-batch capture reaches a rendered warehouse and Health Meter Training
+dialog (`20261012T0149Z-oni-warehouse`). The numeric-key repeat
+`20261012T0150Z-oni-warehouse-input` shows the intro cinematic still playing
+at41000; the scheduled40000 Close and42000 W therefore precede the health
+dialog. Its final image is still modal. Neither run proves walking; defer
+Close and the movement probe until after the observed60000-batch modal.
+
+### Warehouse movement verified against control
+
+`20261012T0152Z-oni-warehouse-late`: Close465,410 at65000; reviewed66000
+image is unobstructed gameplay. Hold W (VK87) at67000..77000, stop85000.
+The final image shows Konoko beyond the starting corner, attacked by an enemy,
+health depleted and a weapon-pickup prompt. Matching85000-batch no-W run
+`20261012T0153Z-oni-warehouse-control` retains the starting corner/door and
+full health. Both use the same normal menu route, numeric intro keys27/32,
+unchanged guest data and module above. This verifies ordinary movement in
+Syndicate Warehouse; it does not fix the separate training standing-turn gate.
+No browser/touch/audio/FPS qualification follows from this CLI result.
+Next register the legacy demo layout and reproduce this route in the browser,
+gating controls on visible dialog/gameplay state rather than fixed wall time.

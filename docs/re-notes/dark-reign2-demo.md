@@ -701,3 +701,17 @@ The final exec connection failed while the box became idle, but all named
 screenshots were recovered and visually reviewed. Owned browser/server PID
 was checked against its command line and stopped. Evidence and exact input
 route: scratch/runs/20261012T0127Z-dark-reign2-browser/.
+
+### Longer browser observation (2026-10-12 01:43Z)
+
+Separate run `20261012T0139Z-dark-reign2-browser-progress` retained before,
+selection, order and 10/30/60-second images, guest tick samples, exact script
+and environment. On this replay the intro camera was still descending when
+the scheduled drag and order fired: before/selected have no gameplay HUD or
+selection brackets. The HUD appears by the final image. Thus the run does
+not reproduce the earlier successful selection and cannot validate movement.
+Guest ticks advance 140363 to 200607 over 60.24 seconds, with running=true;
+this rules out a stopped guest clock, not a world-simulation bug. Next gate
+input on the visible gameplay HUD and verified selection rather than fixed
+intro delays. No runtime fix is justified by this replay alone. Browser and
+server closed normally; all named evidence copied before stopping the boat.
