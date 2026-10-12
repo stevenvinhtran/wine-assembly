@@ -94,3 +94,25 @@ module hash verified before sole CLI run. No gameplay repeat for transfer.
 Next register local-only nocturne_demo route and validate ordinary browser
 walking, original brightness/calibration UX and weapon use. Source assets
 remain remote, local test/binaries/candidates/nocturne-demo/game absent.
+
+## 2026-10-12 10:35Z — Registered browser walking and firing
+
+Local-only registration6ec2393d9 pushed: app nocturne_demo, candidate
+nocturne-demo, original17files under game/ with System_Files/system kept
+as game/system. Arrow touch pad plus Fire/use, Draw, Jump, Confirm, Menu.
+Prepare and JS syntax/entry checks PASS; touch buttons not yet exercised.
+
+1033Z-nocturne-browser-held on bx_n7d6u8rt, Chrome155.0.8059.39/WebGL/worker,
+COI true, exact module5e8f1716...69a. Ordinary Space clears startup and
+calibration.300ms key presses select Volume3/Chapter6; reviewed chapter,
+before, moved, action. Up4s displaces character; D then Space2s shows
+weapon HUD and muzzle flash. Browser walking/firing verified, no FPS/audio
+claim. Scene remains dark; brightness calibration and touch next.
+
+1027Z first browser never launches guest: fork omitted build/wine-assembly.wasm
+and fallback compiler request HTTP404. Build restored and module hash checked;
+not a Nocturne runtime regression.1029Z built launch reaches menu but near-zero
+Enter press misses state polling, stays on Start; held300ms resolves. Original
+touch code already has minimum key hold for polled games, so no speculative
+input-engine patch added. All evidence collected. Result published only for
+1033Z reviewed gameplay; main integration remains ops-owned.
