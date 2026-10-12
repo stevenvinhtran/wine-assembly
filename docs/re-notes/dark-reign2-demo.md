@@ -767,3 +767,20 @@ displacement. Exit0,7612batches/252.465s, no runtime/source patch.
 Next match the browser hold duration to this500ms control and observe the
 mission script/command effects; real time alone is not an established cause.
 The exact child arguments, command timestamps and replies are preserved.
+
+### Held browser order control (2026-10-12 03:45Z)
+
+Run `20261012T0341Z-dark-reign2-held-click` changes only the movement-order
+button hold from 180 to 500 ms relative to the earlier threaded browser route.
+Chrome155, WebGL, cross-origin isolation and worker threads; rebuilt module
+SHA256 `9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6`.
+Reviewed before/selected captures confirm the mission HUD and real selection.
+After60 retains the formation with the green order marker; no displacement.
+Guest clock205816 to266204 advances. A longer hold alone does not resolve it.
+Stage complete03:45:35 and finally-close artifacts recovered despite outer
+transport exit143; no emulator crash inferred from that transport status.
+
+Next compare command consumption/simulation progress, accounting for the
+browser's Brainsick difficulty and pointer-coordinate mapping versus CLI.
+Do not repeat hold-duration or Threads-off controls already covered, or infer
+a timing fix from the CLI cinematic alone. No source change in this run.

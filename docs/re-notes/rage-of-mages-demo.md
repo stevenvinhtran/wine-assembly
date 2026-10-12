@@ -56,3 +56,54 @@ are unverified and must not be extracted/launched as a complete installer.
 Next resume this exact independent source when its HTTP service responds;
 do not retry the damaged multipart ZIP with further readers. The temporary
 box was stopped after this source-only investigation; no browser/CLI slot used.
+
+## Independent demo recovered and launched (2026-10-12 03:46 UTC)
+
+Direct Archive server `https://ia803103.us.archive.org/15/items/GSCDA1998/1998-10/GS1098.ISO`
+accepted 1 MB HTTP ranges for the exact ISO extent identified above. Full
+installer42,111,946bytes SHA256
+`c27baf4367b3593e1d0572b7411ffd485319f997075d94ec15344a25a64c83bc`.
+7-Zip extracts this ZIP SFX successfully (14 files,68,092,880bytes), unlike
+the damaged multipart source. The PE-format warning is expected for this
+ZIP SFX; extraction reports Everything is Ok. No installer execution needed.
+Remote fixture `/home/user/rage-of-mages-demo-preflight/independent` on
+bx_qvkda4g8; originals retained. Logs/hashes in0320Z preflight evidence.
+
+Game `rom.exe`2,059,776bytes SHA256
+`0efdb79503d9ffc851a08317d8471c300b1afb26b28866c99ef5c9f3da6fe019`;
+image base0x400000, imports DirectDraw, DirectSound and bundled smackw32.dll.
+All resources are in the same directory. CLI `--exe=<dir>/rom.exe
+--vfs-include=**/* --quiet-api --batch-size=100000` reaches a clear English
+main menu by3000batches (10.584s). The branch module hash is
+`9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6`.
+Exact commands/logs/screenshots:0347Z-rage-of-mages-first-launch.
+
+Ordinary `3100:click:220:105` opens New Game and reaches the rendered world
+with opening dialogue by7000batches (0348Z-rage-of-mages-new-game).
+`7100:click:316:310` advances to the next character's dialogue (0349Z world).
+These prove menu/dialogue input only, not unit movement or qualified gameplay.
+The harness warns real ole32/shell32/comctl32 DLL files are absent; imports
+use available WAT handlers. No ordinal trap occurred in these runs, but full
+fixture equivalence is not asserted. Browser, registration, touch/audio/FPS
+remain unverified. No emulator source changes were needed to reach this point.
+
+### Ordinary selection and movement verified
+
+0350Z-rage-of-mages-dialogue repeats OK clicks at7100..12100 in1000-batch
+steps, reaching the world and a top-left tip. Close tip at(290,156) batch14000,
+select the wizard at(240,309)14500. Selected.png15000 shows her portrait,
+commands and health/mana bars. Click(240,230)15100 reaches another encounter
+dialogue; this alone does not expose the unit position.
+
+0352Z-rage-of-mages-movement-followup adds(316,310) clicks at20000,21000,
+22000 to progress dialogue. By25000 the selected wizard is visibly near
+(300,309), displaced from(240,309), while the other character and ground
+landmarks stay put. These ordinary clicks establish selection and movement;
+the later clicks can also issue ground orders once dialogue closes, so do not
+attribute the entire route solely to the15100 click. The15500 intermediate
+capture is already obscured by dialogue. Final still has a top-left gameplay
+tip, but both units and the selected character's HUD are clearly visible.
+Reviewed selected/final images, commands and logs are preserved; no guest
+state edits. Bounded25000-batch replay exits0. Next local-only registration
+and browser/touch route, then audio and scene-qualified FPS. CLI batches/s
+are not FPS; no release approval or public asset distribution is implied.
