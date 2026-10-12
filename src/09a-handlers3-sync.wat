@@ -711,22 +711,26 @@ nW — STUB: unimplemented
         (then (call $gs32 (i32.add (local.get $vector) (i32.shl (local.get $index) (i32.const 2))) (i32.const 0))))
       (local.set $node (call $gl32 (local.get $node)))
       (br $next))))
-  (func $tls_attach_slots (param $vector i32) (result i32)
-    (local $node i32)
-    (if (i32.eqz (global.get $tls_registry_node))
+  (func $tls_attach_slots_with_node (param $vector i32) (param $node i32) (result i32)
+    (if (i32.eqz (local.get $node))
       (then
-        (local.set $node (call $heap_alloc (i32.const 8)))
-        (if (i32.eqz (local.get $node)) (then (return (i32.const 0))))))
+        (if (i32.eqz (global.get $tls_registry_node))
+          (then
+            (local.set $node (call $heap_alloc (i32.const 8)))))))
     (call $tls_lock)
     (if (local.get $node)
       (then
         (call $gs32 (local.get $node) (i32.load offset=8 (global.get $TLS_NEXT_INDEX_SHARED)))
         (i32.store offset=8 (global.get $TLS_NEXT_INDEX_SHARED) (local.get $node))
         (global.set $tls_registry_node (local.get $node))))
-    (call $gs32 (i32.add (global.get $tls_registry_node) (i32.const 4)) (local.get $vector))
+    (if (global.get $tls_registry_node)
+      (then
+        (call $gs32 (i32.add (global.get $tls_registry_node) (i32.const 4)) (local.get $vector))))
     (global.set $tls_slots (local.get $vector))
     (call $tls_unlock)
     (i32.const 1))
+  (func $tls_attach_slots (param $vector i32) (result i32)
+    (call $tls_attach_slots_with_node (local.get $vector) (i32.const 0)))
   (func $tls_ensure_slots (result i32)
     (local $vector i32)
     (if (global.get $tls_slots) (then (return (global.get $tls_slots))))
@@ -1031,6 +1035,7 @@ nW — STUB: unimplemented
     (local $cs i32) (local $me i32) (local $prev i32) (local $spin i32)
     (local $owner i32) (local $round i32)
     (local.set $cs (call $g2w (local.get $arg0)))
+    (call $cs_register (local.get $cs))
     (local.set $me (global.get $current_thread_id))
     ;; Contended from inside a synchronous wndproc: parking is not available.
     ;; $wnd_send_message runs the procedure on a recursive interpreter frame,
@@ -1130,6 +1135,7 @@ nW — STUB: unimplemented
   (func $handle_TryEnterCriticalSection (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
     (local $cs i32) (local $me i32) (local $prev i32)
     (local.set $cs (call $g2w (local.get $arg0)))
+    (call $cs_register (local.get $cs))
     (local.set $me (global.get $current_thread_id))
     (if (call $cs_owner_aligned (local.get $cs))
       (then

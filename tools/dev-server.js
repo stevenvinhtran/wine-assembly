@@ -267,6 +267,11 @@ const AGENT_INJECT = '\n<script type="module">\n'
   + '</script>\n';
 
 function serveStatic(req, res, urlPath, agentInject) {
+  if (urlPath === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
   const full = resolveStatic(urlPath);
   if (!full) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });

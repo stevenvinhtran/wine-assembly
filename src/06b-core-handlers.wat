@@ -1280,6 +1280,11 @@
         (call $win32_dispatch (i32.div_u (i32.sub (local.get $target) (global.get $thunk_guest_base)) (i32.const 8)))
         (if (global.get $steps) (then (global.set $eip (local.get $ret_addr))))
         (return)))
+    (if (i32.eqz (call $guest_addr_mapped (local.get $target)))
+      (then
+        (global.set $fault_address (local.get $target))
+        (call $raise_exception (i32.const 0xC0000005))
+        (return)))
     (global.set $eip (local.get $target))
     (return_call $branch_end))
   ;; 142: push [base+disp]. op=base, disp in word.

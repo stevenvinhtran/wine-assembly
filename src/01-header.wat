@@ -3437,6 +3437,7 @@
   ;; child sub-dialog, hwnd-less input in the pump still routes to the outer
   ;; modal dialog's dlgproc. Cleared when the modal ends (dlg_ended).
   (global $dlg_pump_hwnd (mut i32) (i32.const 0))   ;; Modal pump hwnd (DialogBoxParamA only)
+  (global $dlg_call_esp (mut i32) (i32.const 0))    ;; ESP before invoking DlgProc in modal pump
   (global $dlg_result   (mut i32) (i32.const 0))    ;; EndDialog return value
   (global $dlg_ended    (mut i32) (i32.const 0))    ;; Flag: EndDialog was called
   ;; HWND whose EndDialog teardown is currently running. Real USER only marks

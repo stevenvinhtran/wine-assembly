@@ -183,8 +183,8 @@ add('TooltipState', [
 ], 'the wndproc that heap_allocs 64 bytes, plus its three helpers, all taking that block as $sw');
 
 add('TabNativeState', [
-  '$tab_native_note_message', '$tab_native_paint',
-], 'the two readers of $tab_native_state_get\'s 128-byte block');
+  '$tab_native_note_message', '$tab_native_paint', '$tab_wndproc',
+], 'the handlers and readers of $tab_native_state_get\'s 128-byte block');
 
 add('ToolbarState', [
   '$toolbar_ensure_state', '$toolbar_button_ptr', '$toolbar_button_width_core',

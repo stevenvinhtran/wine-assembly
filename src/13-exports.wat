@@ -415,6 +415,7 @@
   (func (export "get_ebp") (result i32) (i32.load offset=20 (global.get $reg_base)))
   (func (export "get_esi") (result i32) (i32.load offset=24 (global.get $reg_base)))
   (func (export "get_edi") (result i32) (i32.load offset=28 (global.get $reg_base)))
+  (func (export "get_fault_address") (result i32) (global.get $fault_address))
   ;; The segment registers a 16-bit task is holding. Invisible everywhere until
   ;; now, and a wrong one is what a whole class of Win16 bug looks like: the
   ;; task pushes DS as half of a far pointer and the API on the other side
@@ -718,6 +719,7 @@
   (func (export "test_reserve_tls_index") (result i32) (call $tls_reserve))
   (func (export "get_tls_slots") (result i32) (global.get $tls_slots))
   (func (export "set_tls_slots") (param i32) (drop (call $tls_attach_slots (local.get 0))))
+  (func (export "set_tls_slots_with_node") (param i32) (param i32) (drop (call $tls_attach_slots_with_node (local.get 0) (local.get 1))))
   (export "ensure_tls_slots" (func $tls_ensure_slots))
   ;; Post queue exports for IPC injection
   (func (export "get_main_hwnd") (result i32) (global.get $main_hwnd))

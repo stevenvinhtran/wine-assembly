@@ -45,10 +45,7 @@
     (local.set $ctrl_class (call $ctrl_table_get_class (local.get $hwnd)))
     (if (call $tab_native_is (local.get $hwnd))
       (then
-        (call $tab_native_note_message
-          (local.get $hwnd) (local.get $msg) (local.get $wParam) (local.get $lParam))
-        (if (i32.eq (local.get $msg) (i32.const 0x000F))
-          (then (return (call $tab_native_paint (local.get $hwnd)))))))
+        (return (call $tab_wndproc (local.get $hwnd) (local.get $msg) (local.get $wParam) (local.get $lParam)))))
     ;; A registered status bar keeps ctrl_class=0 so its guest wndproc can
     ;; perform MFC layout. Its shared-surface paint and text/simple-mode mirror
     ;; are WAT-owned; otherwise Print Preview can leave an old prompt visible,

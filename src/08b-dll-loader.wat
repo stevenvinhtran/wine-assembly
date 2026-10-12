@@ -439,6 +439,8 @@
     ;; natively costs nothing and matches how a newer comctl32 would behave.
     (if (call $str_eq (local.get $name_wa) "InitCommonControlsEx")
       (then (return (call $lookup_api_id "InitCommonControlsEx"))))
+    (if (call $str_eq (local.get $name_wa) "D3DXCreateTexture")
+      (then (return (call $lookup_api_id "D3DXCreateTexture"))))
     (i32.const -1))
 
   ;; WinSock 1.1 commonly imports WSOCK32 by ordinal. Resolve ordinals for

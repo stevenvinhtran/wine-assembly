@@ -2198,6 +2198,7 @@
     (global.set $dlg_show_pending (local.get $hwnd))
     ;; Save return address — we'll restore it when EndDialog is called
     (global.set $dlg_ret_addr (call $gl32 (i32.load offset=16 (global.get $reg_base))))
+    (global.set $dlg_call_esp (i32.load offset=16 (global.get $reg_base)))
     ;; Apply the five-argument stdcall cleanup explicitly. The callback frame
     ;; below reaches back across these 24 bytes so the consumed API frame stays
     ;; beneath it as nested-pump storage.

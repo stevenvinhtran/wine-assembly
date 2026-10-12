@@ -896,8 +896,7 @@
     (if (call $pipe_read_file (local.get $arg0) (local.get $arg1)
           (local.get $arg2) (local.get $arg3))
       (then (return)))
-    (if (i32.and (i32.ne (local.get $arg4) (i32.const 0))
-                 (i32.ne (call $iocp_assoc_find (local.get $arg0)) (i32.const 0)))
+    (if (local.get $arg4)
       (then
         ;; InternalHigh (OVERLAPPED+4) is where the byte count belongs, so the
         ;; host writes it there directly instead of into a scratch dword.
@@ -909,7 +908,7 @@
         ;; 997 here is the lazy-mount park, not the guest's pending status:
         ;; re-run this exact call once the host has the bytes.
         (if (i32.eq (local.get $err) (i32.const 997))
-          (then (call $io_block (i32.const 24)) (return)))
+          (then (call $io_block (i32.const 0)) (return)))
         (if (i32.and (i32.ne (local.get $err) (i32.const 0))
                      (i32.ne (local.get $err) (i32.const 38)))
           (then
@@ -919,14 +918,25 @@
             (return)))
         (local.set $bytes (call $gl32 (i32.add (local.get $arg4) (i32.const 4))))
         (if (local.get $arg3) (then (call $gs32 (local.get $arg3) (local.get $bytes))))
-        (drop (call $iocp_complete_overlapped (local.get $arg0) (local.get $arg4)
-          (local.get $bytes)
-          ;; 38 = ERROR_HANDLE_EOF: a legitimate short read, reported to the
-          ;; guest as STATUS_END_OF_FILE in OVERLAPPED.Internal.
-          (select (i32.const 0xC0000011) (i32.const 0)
-            (i32.eq (local.get $err) (i32.const 38)))))
-        (global.set $last_error (i32.const 997)) ;; ERROR_IO_PENDING
-        (i32.store offset=0 (global.get $reg_base) (i32.const 0))
+        ;; Set Internal to 0 (STATUS_SUCCESS)
+        (call $gs32 (local.get $arg4) (i32.const 0))
+        ;; Signal hEvent if present
+        (if (call $gl32 (i32.add (local.get $arg4) (i32.const 16)))
+          (then (drop (call $host_set_event (call $gl32 (i32.add (local.get $arg4) (i32.const 16)))))))
+        (if (call $iocp_assoc_find (local.get $arg0))
+          (then
+            (drop (call $iocp_complete_overlapped (local.get $arg0) (local.get $arg4)
+              (local.get $bytes)
+              ;; 38 = ERROR_HANDLE_EOF: a legitimate short read, reported to the
+              ;; guest as STATUS_END_OF_FILE in OVERLAPPED.Internal.
+              (select (i32.const 0xC0000011) (i32.const 0)
+                (i32.eq (local.get $err) (i32.const 38)))))
+            (global.set $last_error (i32.const 997)) ;; ERROR_IO_PENDING
+            (i32.store offset=0 (global.get $reg_base) (i32.const 0))
+            (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24)))
+            (return)))
+        (global.set $last_error (i32.const 0))
+        (i32.store offset=0 (global.get $reg_base) (i32.const 1))
         (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24)))
         (return)))
     (local.set $err (call $host_fs_read_file_result
@@ -3744,6 +3754,56 @@
     (i32.store offset=0 (global.get $reg_base) (local.get $found))
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 8))))
 
+    ;; PathIsDirectoryA(pszPath): returns TRUE if path exists and has FILE_ATTRIBUTE_DIRECTORY (0x10)
+  (func $handle_PathIsDirectoryA (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $w i32) (local $len i32) (local $attrs i32) (local $is_dir i32)
+    (local.set $w (call $shell_path_widen_one (local.get $arg0)))
+    (if (local.get $w)
+      (then
+        (local.set $len (call $shell_path_wlen (local.get $w) (i32.const 260)))
+        (if (i32.gt_s (local.get $len) (i32.const 0))
+          (then
+            (local.set $attrs (call $shell_path_attrs_w (local.get $w) (local.get $len)))
+            (if (i32.and (i32.ne (local.get $attrs) (i32.const -1))
+                         (i32.ne (i32.and (local.get $attrs) (i32.const 16)) (i32.const 0))) ;; 0x10 = FILE_ATTRIBUTE_DIRECTORY
+              (then (local.set $is_dir (i32.const 1))))))
+        (call $heap_free (local.get $w))))
+    (i32.store offset=0 (global.get $reg_base) (local.get $is_dir))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 8))))
+
+  ;; PathRemoveExtensionA(pszPath): strips the file extension by writing \0 at the last dot
+  (func $handle_PathRemoveExtensionA (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $p i32) (local $last_dot i32) (local $ch i32)
+    (local.set $p (call $g2w (local.get $arg0)))
+    (if (local.get $p)
+      (then
+        (block $done (loop $scan
+          (local.set $ch (i32.load8_u (local.get $p)))
+          (br_if $done (i32.eqz (local.get $ch)))
+          (if (i32.or (i32.eq (local.get $ch) (i32.const 92)) (i32.eq (local.get $ch) (i32.const 47))) ;; '\' or '/'
+            (then (local.set $last_dot (i32.const 0))))
+          (if (i32.eq (local.get $ch) (i32.const 46)) ;; '.'
+            (then (local.set $last_dot (local.get $p))))
+          (local.set $p (i32.add (local.get $p) (i32.const 1)))
+          (br $scan)))
+        (if (local.get $last_dot)
+          (then (i32.store8 (local.get $last_dot) (i32.const 0))))))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 8))))
+
+    ;; GetOverlappedResult(hFile, lpOverlapped, lpNumberOfBytesTransferred, bWait) - 4 args (16 bytes)
+  (func $handle_GetOverlappedResult (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
+    (local $bytes i32)
+    (if (local.get $arg1) ;; lpOverlapped
+      (then
+        ;; InternalHigh (lpOverlapped + 4) holds bytes transferred in Wine-Assembly's VFS
+        (local.set $bytes (call $gl32 (i32.add (local.get $arg1) (i32.const 4))))
+        (if (local.get $arg2) ;; lpNumberOfBytesTransferred
+          (then (call $gs32 (local.get $arg2) (local.get $bytes))))
+        (i32.store offset=0 (global.get $reg_base) (i32.const 1))) ;; return TRUE
+      (else
+        (global.set $last_error (i32.const 87)) ;; ERROR_INVALID_PARAMETER
+        (i32.store offset=0 (global.get $reg_base) (i32.const 0)))) ;; return FALSE
+    (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 20))))
 
   ;; Wide recursive directory creation uses actual VFS attributes and creation,
   ;; never a success-only stub. SECURITY_ATTRIBUTES descriptors are unsupported:

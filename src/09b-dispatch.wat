@@ -212,6 +212,17 @@
     (if (i32.eq (local.get $name_rva) (i32.const 0xCACA003C))
       (then
         (local.set $esp (i32.load offset=16 (global.get $reg_base)))
+        ;; If callee was __cdecl (e.g. MBAA.exe Dialog 101 at 0x4a1f50),
+        ;; the 4 arguments (16 bytes) were not popped by ret.
+        ;; In that case, [esp..esp+12] are the unpopped arguments (arg0..arg3),
+        ;; and the retained DefDlgProc frame is at esp+16 (where [esp+20..esp+32]
+        ;; match arg0..arg3).
+        (if (i32.and
+              (i32.eq (call $gl32 (local.get $esp)) (call $gl32 (i32.add (local.get $esp) (i32.const 20))))
+              (i32.eq (call $gl32 (i32.add (local.get $esp) (i32.const 4))) (call $gl32 (i32.add (local.get $esp) (i32.const 24)))))
+          (then
+            (local.set $esp (i32.add (local.get $esp) (i32.const 16)))
+            (i32.store offset=16 (global.get $reg_base) (local.get $esp))))
         (i32.store offset=0 (global.get $reg_base)
           (call $dialog_proc_result
             (i32.load (call $g2w (i32.add (local.get $esp) (i32.const 4))))
@@ -280,6 +291,13 @@
     ;; marker, candidate, then that same saved pair.
     (if (i32.eq (local.get $name_rva) (i32.const 0xCACA0001))
       (then
+        ;; If the callee was __cdecl (e.g. MBAA.exe Dialog 101 DlgProc at 0x4a1f50),
+        ;; the 4 arguments (16 bytes) were not popped. Check if DIFC or CREA
+        ;; is 16 bytes further down.
+        (if (i32.eq (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16))) (i32.const 0x43524541)) ;; "CREA"
+          (then (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16)))))
+        (if (i32.eq (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16))) (i32.const 0x44494643)) ;; "DIFC"
+          (then (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16)))))
         ;; CACA0029 puts a private marker in front of the ordinary saved frame
         ;; only while WM_CREATE is outstanding. This keeps the shared thunk's
         ;; ShowWindow/dialog uses from interpreting their LRESULT as a create
@@ -870,6 +888,29 @@
         ;; unchanged EIP as "handler left EIP alone" and pop [esp].
         (global.set $handler_set_eip (i32.const 1))
         (local.set $arg4 (i32.const 0))  ;; reuse as wndproc temp
+        ;; If the dialog procedure was __cdecl (e.g. MBAA.exe Dialog 101/102),
+        ;; the 4 arguments (16 bytes) were not popped by ret. Realign ESP to dlg_call_esp.
+        (if (global.get $dlg_call_esp)
+          (then
+            (if (i32.eq (i32.load offset=16 (global.get $reg_base))
+                        (i32.sub (global.get $dlg_call_esp) (i32.const 16)))
+              (then
+                (i32.store offset=16 (global.get $reg_base) (global.get $dlg_call_esp))))
+            (global.set $dlg_call_esp (i32.const 0))))
+        (if (i32.and
+              (global.get $dlg_ret_addr)
+              (i32.eq (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16)))
+                      (global.get $dlg_ret_addr)))
+          (then
+            (i32.store offset=16 (global.get $reg_base)
+              (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 16)))))
+        (if (i32.and
+              (global.get $dlg_ret_addr)
+              (i32.eq (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
+                      (global.get $dlg_ret_addr)))
+          (then
+            (i32.store offset=16 (global.get $reg_base)
+              (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))))
         (if (i32.load (global.get $SHARED_DLG_ENDED))
           (then
             (global.set $dlg_ended (i32.const 1))
@@ -1009,7 +1050,9 @@
             ;; dispatches natively for the same reason.
             (if (i32.and
                   (i32.ne (local.get $arg0) (global.get $dlg_pump_hwnd))
-                  (i32.ne (call $ctrl_table_get_class (local.get $arg0)) (i32.const 0)))
+                  (i32.or
+                    (i32.ne (call $ctrl_table_get_class (local.get $arg0)) (i32.const 0))
+                    (call $tab_native_is (local.get $arg0))))
               (then
                 (drop (call $control_wndproc_dispatch
                   (local.get $arg0) (local.get $arg1) (local.get $arg2) (local.get $arg3)))
@@ -1033,6 +1076,7 @@
                 (global.set $eip (global.get $dlg_loop_thunk))
                 (global.set $steps (i32.const 0))
                 (return)))
+            (global.set $dlg_call_esp (i32.load offset=16 (global.get $reg_base)))
             (i32.store offset=16 (global.get $reg_base) (i32.sub (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
             (call $gs32 (i32.load offset=16 (global.get $reg_base)) (global.get $dlg_loop_thunk))
             (call $gs32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)) (local.get $arg0))
@@ -1088,6 +1132,7 @@
               (then (local.set $arg4 (global.get $dlg_proc))))
             (if (i32.lt_u (local.get $arg4) (global.get $image_base))
               (then (local.set $arg4 (global.get $dlg_proc))))
+            (global.set $dlg_call_esp (i32.load offset=16 (global.get $reg_base)))
             (i32.store offset=16 (global.get $reg_base) (i32.sub (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
             (call $gs32 (i32.load offset=16 (global.get $reg_base)) (global.get $dlg_loop_thunk))
             (call $gs32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)) (local.get $arg0))
@@ -1136,6 +1181,7 @@
                 ;; can't reroute input to the inner sub-dialog.
                 (local.set $arg0 (global.get $dlg_pump_hwnd))
                 (local.set $arg4 (global.get $dlg_proc))))
+            (global.set $dlg_call_esp (i32.load offset=16 (global.get $reg_base)))
             (i32.store offset=16 (global.get $reg_base) (i32.sub (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
             (call $gs32 (i32.load offset=16 (global.get $reg_base)) (global.get $dlg_loop_thunk))
             (call $gs32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)) (local.get $arg0))
@@ -1178,6 +1224,7 @@
             ;; arguments are hwnd, WM_TIMER, id, and the tick count.
             (if (local.get $arg3)
               (then
+                (global.set $dlg_call_esp (i32.load offset=16 (global.get $reg_base)))
                 (i32.store offset=16 (global.get $reg_base) (i32.sub (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
                 (call $gs32 (i32.load offset=16 (global.get $reg_base)) (global.get $dlg_loop_thunk))
                 (call $gs32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)) (local.get $arg0))
@@ -1202,6 +1249,7 @@
               (then (local.set $arg4 (global.get $dlg_proc))))
             (if (i32.lt_u (local.get $arg4) (global.get $image_base))
               (then (local.set $arg4 (global.get $dlg_proc))))
+            (global.set $dlg_call_esp (i32.load offset=16 (global.get $reg_base)))
             (i32.store offset=16 (global.get $reg_base) (i32.sub (i32.load offset=16 (global.get $reg_base)) (i32.const 20)))
             (call $gs32 (i32.load offset=16 (global.get $reg_base)) (global.get $dlg_loop_thunk))
             (call $gs32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 4)) (local.get $arg0))
@@ -1659,6 +1707,17 @@
         (call $restore_win32_nonvolatile
           (local.get $saved_ebx) (local.get $saved_esi)
           (local.get $saved_edi) (i32.load offset=20 (global.get $reg_base)))
+        (if (global.get $api_log_on) (then (call $host_log_api_exit)))
+        (return)))
+
+    ;; longjmp restores nonvolatile registers and EBP/ESP/EIP from jmp_buf.
+    ;; Restoring the caller's nonvolatiles here would overwrite the restored
+    ;; registers and corrupt the caller's restored frame.
+    (if (i32.eq (local.get $api_id) (global.get $API_ID_longjmp))
+      (then
+        (call $handle_longjmp
+          (local.get $arg0) (local.get $arg1) (local.get $arg2)
+          (local.get $arg3) (local.get $arg4) (local.get $name_ptr))
         (if (global.get $api_log_on) (then (call $host_log_api_exit)))
         (return)))
 

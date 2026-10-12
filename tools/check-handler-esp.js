@@ -44,6 +44,7 @@ for (const entry of apiTable) {
 const EXEMPT = new Set([
   'wsprintfA', 'wsprintfW', 'sprintf', '_snprintf', 'sscanf',  // cdecl varargs
   '_EH_prolog',  // naked helper builds an SEH frame and returns manually
+  'longjmp',     // restores ESP from jmp_buf
 ]);
 
 // COM interface methods carry a placeholder nargs of 5 in api_table.json

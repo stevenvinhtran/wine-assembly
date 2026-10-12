@@ -21,6 +21,7 @@
   (func $guest_memmove (param $dst i32) (param $src i32) (param $size i32)
     (local $i i32) (local $chunk i32) (local $remaining i32)
     (if (i32.eqz (local.get $size)) (then (return)))
+    (if (i32.lt_u (local.get $dst) (i32.const 0x10000)) (then (return)))
     ;; One destination notification covers both linear and chunked copies.
     (call $invalidate_code_write (local.get $dst) (local.get $size))
     (if (i32.and
@@ -182,6 +183,7 @@
     (local $i i32) (local $d i32) (local $s i32)
     (local.set $bytes (i32.mul (local.get $n) (local.get $w)))
     (local.set $dst (local.get $edi))
+    (if (i32.lt_u (local.get $dst) (i32.const 0x10000)) (then (return)))
     (local.set $src (local.get $esi))
     (local.set $step (local.get $w))
     (if (global.get $df)
@@ -249,6 +251,7 @@
     (local $b i32) (local $wa i32) (local $k i32) (local $c i32) (local $mask i64)
     (local.set $bytes (i32.mul (local.get $n) (local.get $w)))
     (local.set $dst (local.get $edi))
+    (if (i32.lt_u (local.get $dst) (i32.const 0x10000)) (then (return)))
     (local.set $step (local.get $w))
     (if (global.get $df)
       (then
