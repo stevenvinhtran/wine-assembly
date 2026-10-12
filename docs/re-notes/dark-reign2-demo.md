@@ -652,3 +652,26 @@ Source, archive hash and extraction layout are at the top of this note. No
 assets may be shipped by the registration; no public deployment is authorized.
 Evidence: move-selected.png, move-final.png, move-input.log, move-guest.log in
 scratch/runs/20261012T0045Z-dark-reign2-socket-attribute/.
+
+### Gameplay presentation sample and worker recovery (2026-10-12)
+
+Fresh fork bx_yry4rfby, same ordinary movement route; frame-stats and
+present-distinct start at2150, stop2900. 83.043s total; reviewed perf-final.png
+matches the moved formation. 279 raw present events versus140 host uploads;
+reported wall rates13.3/s and6.6/s respectively.139 hashed presentations all
+changed,139 unique images. Do not call13.3 game FPS: near-zero alternating
+raw intervals and the roughly2:1 count need presentation-path correlation.
+Host upload cadence is a CLI measurement, not verified browser FPS. Raw
+series and logs: scratch/runs/20261012T0120Z-dark-reign2-frame-telemetry/.
+
+The fork again omitted test/binaries/tlbs/stdole2.tlb; exact local15088-byte
+fixture restored before the successful run. build/wine-assembly.wasm was
+absent at post-run hashing, so no inherited module hash is asserted for this
+sample. Source/build identity must be pinned on the browser replay.
+
+Oni recovery: launch-ux hit the Claude weekly limit; no process still ran.
+Its Load Game attempt stopped before launch for missing
+/home/user/oni-wt/test/binaries/tlbs/stdole2.tlb. Restored the same local fixture
+on bx_n47sae4r; saved the failed log in0119Z-oni-worker-recovery. No Oni
+runtime progress claimed. Ops round8 instruction was still an unsent draft;
+main remained0304a8549, registration/source integration not completed.
