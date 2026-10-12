@@ -159,3 +159,36 @@ All named evidence collected. Remote bx_k293q9e3 retains candidate code and
 original source; no diagnostic observer exports. FMUL fix462848051 pushed
 for ops integration. Removed its clean pushed local worktree to recover70MB;
 local disk still below2GB, so all heavy work stays remote.
+
+## 2026-10-12 09:07Z — movement timing correction
+
+Main remote ref remains0304. Fork bx_ahkvwes2 from bx_k293q9e3.
+0900Z-sanity-movement failed before guest launch because fork omitted
+/home/user/main-0304-z16/test/binaries/tlbs/stdole2.tlb; restored existing
+15088-byte fixture from coordinator. Build PASS, receipts preserved.
+0903Z-sanity-movement retains module5e8f1716...69a and completes4438 batches
+in150s. Reviewed before2800/dismissed3000 show Processing lightmaps;
+after3500 is opening camera, final is tutorial with Cain. Therefore the
+2900 click/3110-3400 right-button interval was premature, not evidence
+of broken movement. Retry0907Z moves before/click/dismissed to4500/4600/4800,
+right-button4910-5300, after5400; max5600 batches/240s. No source changes.
+
+0907Z-sanity-post-load-movement completed with reviewed ordinary-input
+gameplay: before4500 shows tutorial; click320,440 at4600 dismisses it;
+dismissed4800 shows HUD and Cain near center of octagonal floor; pointer
+450,280 + right button4910-5300 moves him toward floor edge in after5400.
+Final5600 preserves displaced position. No guest code/state mutation.
+Actual run09:06:13.931Z-09:09:49.430Z, guest log5600 batches/212.085s.
+Receipt records status0 but also spawnSync ETIMEDOUT; retain that wrapper
+anomaly, not a guest crash (normal final stats/PNG exist). Module remains
+5e8f1716da42ea23e7d26c4389153a31f0ece9c02afc7bb9f78cc4b897bf069a.
+
+Next register candidate sanity-demo/app sanity_demo, preserving Game contents
+under game/, Data/SANITY.REZ at game/SANITY.REZ, client.dll at
+game/LITHTECH/client.dll, cwd C:\LITHTECH and original -rez args. Browser
+manifest fileRoot game supplies C:\ paths; exeGuestPath should preserve
+C:\LITHTECH\client.dll. Verify registered CLI/browser, then touch/audio/FPS.
+No public deployment; source/extracted payload lives only on remote snapshot
+bx_ahkvwes2. Local test/candidate-corpus/sanity-demo/game/ not prepared.
+Dark Reign2 next remains semantic command/selection ownership or matched
+CLI observation interval; no repeated queue/pause/difficulty controls.
