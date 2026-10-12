@@ -18,6 +18,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { ThreadManager } = require('../lib/thread-manager');
 
 const hostSource = fs.readFileSync(path.join(__dirname, '..', 'host.js'), 'utf8');
 
@@ -345,4 +346,42 @@ assert.strictEqual(
   assert.strictEqual(audioContexts, 1, 'priming does not build a second context');
 }
 
-console.log('PASS  parked-sleep deadlines, hidden-tab pause and lazy AudioContext');
+// An audio notification can arrive while the cooperative drive loop sleeps.
+// Exercise run()'s wiring, the real event table, and cancellation of the timer.
+{
+  const wine = new WineAssembly();
+  const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true });
+  const tm = new ThreadManager({}, memory, { exports: { get_sync_table: () => 0 } },
+    () => ({ host: {} }));
+  tm._log = () => {};
+  wine.threadManager = tm;
+  wine._frozen = true; // Install the drive loop without executing a guest.
+  wine.run();
+  assert.strictEqual(typeof tm.onRunnable, 'function',
+    'cooperative mode must install the thread-completion wake callback');
+  wine._frozen = false;
+  wine._frozenStep = null;
+  let resumed = 0;
+  const step = () => { resumed++; };
+  const event = tm.createEvent(false, false);
+  wine._scheduleStep(step, 50);
+  const pending = wine._stepTimeoutId;
+  tm.setEvent(event);
+  assert.strictEqual(wine._stepTimeoutId, 0,
+    'an asynchronous audio event cancels the 50ms polling sleep');
+  assert(timers.find(t => t.id === pending).cleared);
+  assert.strictEqual(resumed, 0, 'signaling never re-enters guest code inline');
+  assert.strictEqual(tm.waitSingle(event, 0), 0,
+    'waking the host leaves the auto-reset signal for its guest waiter');
+  assert.strictEqual(tm.waitSingle(event, 0), 0x102, 'the signal is consumed exactly once');
+  wine._stepListenPort.onmessage();
+  assert.strictEqual(resumed, 1);
+  wine._scheduleStep(step, 50);
+  tm._markThreadExited(0xe1000, { tid: 1, state: 'active' }, 0, 'test');
+  assert.strictEqual(wine._stepTimeoutId, 0, 'a completed loader thread wakes its joiner');
+  wine._stepListenPort.onmessage();
+  assert.strictEqual(resumed, 2);
+  wine.running = false;
+}
+
+console.log('PASS  parked-sleep deadlines, cooperative event/exit wakes, hidden-tab pause and lazy AudioContext');

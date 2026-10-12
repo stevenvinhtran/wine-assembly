@@ -6608,6 +6608,10 @@ class WineAssembly {
 
   run(stepsPerSlice = 100000) {
     this.stepsPerSlice = stepsPerSlice;
+    // Cooperative I/O fills, thread exits and audio events also need to cut
+    // a parked step short. Installing this only in _workerParkMain left the
+    // cooperative backend polling for those completions at the sleep cap.
+    if (this.threadManager) this.threadManager.onRunnable = () => this._wakeStep();
     if (this.guestWorker) return this._runThreaded(stepsPerSlice);
     this.running = true;
     this._stopped = false;

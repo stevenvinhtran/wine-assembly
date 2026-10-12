@@ -7967,13 +7967,17 @@
     (local.set $state (call $dx_surf_state_ptr (local.get $entry)))
     (local.set $size (i32.load offset=12 (local.get $entry)))
     (local.set $handle (load.field DxObject misc0 (local.get $entry)))
-    ;; The host cursor from voice_get_pos already includes the snapshot origin.
+    ;; A looping host cursor includes its origin; a one-shot snapshot reports
+    ;; bytes played within the tail that began at the stored start offset.
     ;; While stopped, the stored base itself is the cursor that the next Play uses.
     (if (i32.and
           (i32.ne (i32.and (load.field DxObject flags (local.get $entry))
             (i32.const 1)) (i32.const 0))
           (i32.ne (local.get $handle) (i32.const 0)))
-      (then (local.set $pos (call $host_voice_get_pos (local.get $handle))))
+      (then
+        (local.set $pos (call $host_voice_get_pos (local.get $handle)))
+        (if (i32.eqz (i32.and (load.field DxObject flags (local.get $entry)) (i32.const 4)))
+          (then (local.set $pos (i32.add (local.get $pos) (i32.load offset=12 (local.get $state)))))))
       (else (local.set $pos (i32.load offset=12 (local.get $state)))))
     (if (i32.ne (local.get $size) (i32.const 0))
       (then (local.set $pos (i32.rem_u (local.get $pos) (local.get $size)))))
@@ -8426,6 +8430,10 @@
       (then
         (local.set $size (i32.load offset=12 (local.get $entry)))
         (local.set $position (call $host_voice_get_pos (local.get $handle)))
+        ;; As in GetCurrentPosition, only one-shot snapshots need rebasing.
+        (if (i32.eqz (i32.and (load.field DxObject flags (local.get $entry)) (i32.const 4)))
+          (then (local.set $position
+            (i32.add (local.get $position) (i32.load offset=12 (local.get $state))))))
         (if (i32.ne (local.get $size) (i32.const 0))
           (then
             (local.set $position

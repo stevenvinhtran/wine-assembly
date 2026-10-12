@@ -133,6 +133,22 @@ async function testCooperativeBackend() {
   });
   tm._log = () => {};
 
+  let mainYield = 1, mainEsp = 0x1000, mainResult = null, mainEip = 0;
+  Object.assign(mainInstance.exports, {
+    get_yield_reason: () => mainYield,
+    get_wait_handle: () => 0xE1001,
+    get_wait_timeout: () => 0xffffffff,
+    get_wait_stack_bytes: () => 16, // WaitForSingleObjectEx + return address
+    get_esp: () => mainEsp,
+    guest_read32: () => 0x413fe7,
+    clear_yield: () => { mainYield = 0; },
+    set_eax: value => { mainResult = value; },
+    set_esp: value => { mainEsp = value; },
+    set_eip: value => { mainEip = value; },
+  });
+  let wakes = 0;
+  tm.onRunnable = () => { wakes++; };
+
   let yieldReason = 12;
   let clears = 0;
   let runs = 0;
@@ -159,6 +175,11 @@ async function testCooperativeBackend() {
   assert.strictEqual(vfs.fills[0], pending, "the fill must be this thread's request, not a peer's");
   assert.strictEqual(clears, 0, 'the thread stays parked while the fill is in flight');
   assert.strictEqual(runs, 0, 'a parked thread gets no steps');
+  for (let i = 0; i < 150; i++) {
+    assert.strictEqual(tm.checkMainYield(), true,
+      'an infinite loader join stays parked through arbitrarily many fill polls');
+  }
+  assert.strictEqual(mainResult, null, 'a pending read cannot complete the join');
 
   // Slice 2, fill still in flight: no second fill, still parked.
   tm.runSlice(1000, { quantumSteps: 1000 });
@@ -168,6 +189,9 @@ async function testCooperativeBackend() {
   // The fill lands on the event loop.
   vfs.finishFill();
   await new Promise(resolve => setImmediate(resolve));
+  assert.strictEqual(wakes, 1, 'completion requests a host wake');
+  assert.strictEqual(tm.checkMainYield(), true,
+    'a resident chunk does not imply the loader thread has exited');
 
   // Slice 3: the yield is cleared and the thread runs its slice.
   tm.runSlice(1000, { quantumSteps: 1000 });
@@ -182,6 +206,12 @@ async function testCooperativeBackend() {
   tm.runSlice(1000, { quantumSteps: 1000 });
   assert.strictEqual(clears, 2, 'no pending: retry immediately');
   assert.strictEqual(vfs.fills.length, 1);
+
+  tm._markThreadExited(0xE1001, tm.threads.get(0xE1001), 7, 'test');
+  assert.strictEqual(tm.checkMainYield(), false, 'the join completes only after exit');
+  assert.strictEqual(mainResult, 0, 'a successful join returns WAIT_OBJECT_0, not the exit code');
+  assert.strictEqual(mainEsp, 0x1010, 'WaitForSingleObjectEx pops its complete call frame');
+  assert.strictEqual(mainEip, 0x413fe7, 'the caller resumes after its wait');
 
   console.log('  ok    cooperative backend parks across the async fill and re-enters');
 }
