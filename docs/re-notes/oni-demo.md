@@ -188,3 +188,20 @@ folder. The final script stage is complete and its browser/server auto-closed;
 outer boat exec returned141, so use recovered script artifacts for completion.
 Touch controls, audio and FPS remain unverified. Next mobile/touch validation
 and ops integration; do not mark the game public or fully release-qualified.
+
+## Touch-direction validation (2026-10-12 03:16Z)
+
+Run0307Z-oni-touch uses the same Chrome155/module36029bde...26ef with
+isMobile/hasTouch enabled. New Game465,489 -> Start260,493 reaches training;
+ordinary mouse movement clears orientation. Chrome touch events start at
+the visible direction pad center, drag45px upward, hold2s and release. The
+reviewed step2 shows displacement and the tutorial advances from walking
+to diagonal movement: forward touch input verified, without a keyboard
+substitute. A subsequent upper-left drag delivers both A and W (logged),
+but the diagonal prompt remains while Konoko is against a wall. Do not
+claim that tutorial step complete; repeat on open floor before diagnosing
+touch-direction logic. Final844x390 capture keeps the game and controls
+visible in landscape, with controls in side gutters. This is Chromium touch
+emulation, not Safari or physical-phone validation. Action/Jump, touch-only
+menu/aiming, audio and FPS remain unverified. Core registered compatibility
+can move to ops review; keep these follow-ups separate from launch/gameplay.

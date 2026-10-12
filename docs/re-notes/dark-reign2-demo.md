@@ -751,3 +751,19 @@ command consumption and actual simulation-cycle progress with the working
 CLI, including its synthetic clock versus browser real-time clock. No
 runtime change made. Initial0234Z setup failure was missing Chrome cache in
 the fork; exact Chrome155 installed before the separate successful run.
+
+### Real-time CLI control (2026-10-12 03:07Z)
+
+The synthetic CLI default advances200ms per batch. Initial real-time
+run0258Z-dark-reign2-real-clock reaches the mission HUD but stops at5581
+batches/210s, before scheduled5950+ selection: not a movement test.
+Run0304Z-dark-reign2-live-clock instead uses the existing control-stdin
+channel after190s and records successful replies for every input. Reviewed
+selected.png shows brackets/health at193081 guest ms. Relative target
+(-200,-150), button1 down/up held500ms, then60s observation. At254619ms the
+image is a different mission cinematic, not the starting HUD. This shows
+simulation/scene progress under real time but does not itself prove unit
+displacement. Exit0,7612batches/252.465s, no runtime/source patch.
+Next match the browser hold duration to this500ms control and observe the
+mission script/command effects; real time alone is not an established cause.
+The exact child arguments, command timestamps and replies are preserved.
