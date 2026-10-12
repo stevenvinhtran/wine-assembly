@@ -39,3 +39,32 @@ do not report silent menus alone as a new audio bug. Ordinary keys include
 M move, A attack, E select mercenaries, Esc menu, F2 save/F3 load and Space
 inventory/spellbook. First runtime launch remains untested. Use ROM2.EXE with
 all companion files and both SCENARIO.DLL/SMACKW32.DLL available.
+
+## CLI player movement verified (2026-10-12 04:21 UTC)
+
+Fresh fork bx_dc8nntjd, restored stdole2.tlb and rebuilt the preserved source.
+Module SHA256 `9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6`;
+ROM2.EXE SHA256 `c163964fca7f15958c53c29cef2fe4db4add639a95a3936453f87ccda874ae4b`.
+Use `--exe=<independent>/ROM2.EXE --vfs-include=**/* --quiet-api
+--batch-size=100000`. The3000-batch baseline reaches a rendered icon menu.
+Ordinary click(250,90) batch3100 starts New Game and reaches the opening
+world/dialogue. Click(316,310) at7100,8100,9100 clears the introduction.
+
+Movement route: click character(110,73)11100, screenshot12000; then
+click destination(170,145)12100, final screenshot17000. Reviewed selected.png
+shows the character near(110,73), health bar, portrait and action buttons.
+Final.png shows the selected character near(174,132), farther down the road;
+terrain landmarks stay fixed and additional map area/enemies are revealed.
+This establishes ordinary selection and commanded movement, not just a
+menu or cinematic. All four bounded runs exit0, no guest-state patch or
+emulator source change. No inference of FPS from batches/s.
+
+Evidence:0417Z-rage2-first,0418Z-rage2-newgame,0419Z-rage2-world,
+0420Z-rage2-movement under scratch/runs/20261012T*. Exact commands, logs,
+exit receipts, environment/module/EXE hashes and reviewed images preserved.
+The harness warns missing real ole32/shell32/comctl32 DLL files; available
+WAT handlers were used, no ordinal trap occurred. Keep that fixture limit
+explicit. Browser, touch, audio and qualified FPS remain unverified.
+Next local-only candidate/app registration using the recovered GameStar
+layout, then browser/direct-touch route. Runtime boat stopped with fixtures
+retained in its snapshot; main integration remains ops-owned.
