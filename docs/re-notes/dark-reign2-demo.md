@@ -715,3 +715,26 @@ this rules out a stopped guest clock, not a world-simulation bug. Next gate
 input on the visible gameplay HUD and verified selection rather than fixed
 intro delays. No runtime fix is justified by this replay alone. Browser and
 server closed normally; all named evidence copied before stopping the boat.
+
+### HUD-reviewed browser movement reproduction (2026-10-12 02:24Z)
+
+Fresh build on bx_jnfg98zw passes all build gates and matches module SHA256
+9e835f75dfe5d2fcfb91f592641e945f91baadcd20f6751460777f4dba888cd6.
+Chrome155.0.8059.39, WebGL, Threads and COI. Local registration from the
+pending registration branch; no public service. Run0210Z-dark-reign2-hud-gated
+reached the HUD but timed out its review gate and auto-closed before input;
+this was a test-control failure, with error and screenshot preserved.
+
+Fresh run0217Z-dark-reign2-hud-review extends the review gate. The HUD image
+was visually reviewed before releasing selection. The selected image then
+shows unit brackets, health bars and Guard/Explore before releasing the
+ordinary left-button order. At10/30/60s, units still occupy the starting
+formation despite the green order marker. Guest tick401656 to461892 tracks
+60.24s elapsed with running=true. This is now a post-intro reproduction,
+not merely input sent during the cinematic. It does not identify the cause:
+next compare command consumption and simulation/thread behavior with the
+working CLI, including a same-route Threads-off browser control. Do not
+change input or scheduling based only on the screenshot. Touch/FPS remain
+unverified. Script stage records complete and all artifacts were recovered;
+the outer boat exec returned141, so distinguish transport status from the
+completed browser capture. The script closes its browser/server in finally.

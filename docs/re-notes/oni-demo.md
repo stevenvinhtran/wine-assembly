@@ -148,3 +148,18 @@ Syndicate Warehouse; it does not fix the separate training standing-turn gate.
 No browser/touch/audio/FPS qualification follows from this CLI result.
 Next register the legacy demo layout and reproduce this route in the browser,
 gating controls on visible dialog/gameplay state rather than fixed wall time.
+
+## Local-only registration (2026-10-12 02:06Z)
+
+Commit4e6f18393 on codex/dr2-registration adds candidate `oni-demo` and app
+`oni_demo`, outside the public desktop catalog. SHA1-pinned repack archive:
+d5e687481a2a11b147636ab73fce980717773d8c. Extract to `archive`, copy the
+`Older Oni apps/Windows 98-ME` directory to `game`, then copy
+`GameDataFolderX` to `game/GameDataFolder`. No modern OniX executable is used.
+On temporary bx_jnfg98zw, extraction from the preserved archive plus the
+fetcher's `--prepare` path passes:32 browser-manifest files; legacy executable
+SHA256 matches d1579b3a...7a12d above. Static registry/local-only/unique-ID/path
+checks pass. Fresh network fetch produced no completion receipt and remains
+unverified. Evidence `20261012T0206Z-oni-registration/validation.json`.
+Touch WASD/Action/Jump/Menu is declared but not yet validated. Registration
+is queued for ops integration, not merged or publicly deployed.
