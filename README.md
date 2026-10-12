@@ -1,6 +1,19 @@
+# Wine-Assembly (MBAACC Web Fork)
+
+> [!NOTE]
+> **MBAACC Web Engine Fork**: This repository is a customized fork of [Wine-Assembly (`vgrichina/berrry-wine`)](https://github.com/vgrichina/berrry-wine) maintained by [@stevenvinhtran](https://github.com/stevenvinhtran) to power the WebAssembly browser port of *Melty Blood Actress Again Current Code* ([`melty-web`](https://github.com/stevenvinhtran/melty-web)).
+>
+> **Key Enhancements in this Fork:**
+> - **Direct3D 9 & 2D Sprite Textures**: Implemented `D3DFMT_A8` / paletted texture formats, flexible vertex formats (FVF), and surface management.
+> - **Isolated Positional VFS Streaming**: Added `VirtualFS.readFileAt` and `OVERLAPPED` I/O resumption to support concurrent HTTP Range streaming from gigabyte `.p` archive packs (`0002.p`, `0005.p`) without cursor races.
+> - **DirectSound Streaming BGM**: Priority scheduling for background Vorbis music streaming threads across scene transitions.
+> - **MBAACC Launch Environment**: Custom application profile (`mbaa`), icon manifest, and required Win32 / CRT runtime stubs.
+
+---
+
 # Wine-Assembly: run real Windows 98 apps and games in your browser
 
-**[Try it now → wine-assembly.berrry.app](https://wine-assembly.berrry.app)** · [Apps you can run](https://wine-assembly.berrry.app/apps/) · [The story of how it was built](https://wine-assembly.berrry.app/story.html) · [How it works: articles, design docs & reverse-engineering notes](https://wine-assembly.berrry.app/design/)
+**[Try upstream demo → wine-assembly.berrry.app](https://wine-assembly.berrry.app)** · [Apps you can run](https://wine-assembly.berrry.app/apps/) · [The story of how it was built](https://wine-assembly.berrry.app/story.html) · [How it works: articles, design docs & reverse-engineering notes](https://wine-assembly.berrry.app/design/)
 
 [![3D Pinball Space Cadet, SkiFree, Solitaire and other Windows 98 programs running in a browser tab](icons/og-image.png)](https://wine-assembly.berrry.app)
 
