@@ -835,3 +835,14 @@ page focused/visible. Float step7f4d88=0.1. Thus the simulation advances about
 Reviewed selected/after60 images retain formation and first objective despite
 green ground-order marker. Next trace movement-command enqueue/consumption
 and selected unit ownership/state against CLI; do not repeat clock/pause tests.
+
+### Matched difficulty control (2026-10-12 06:50Z)
+
+Run20261012T0650Z-dr2-normal-control changes the dropdown choice from
+Brainsick to Normal (reviewed difficulty.png), matching the successful CLI.
+Otherwise same Chrome155/WebGL/Threads/800x600 and rebuilt e246f5ef module.
+Reviewed final still retains formation/first objective and green ground marker.
+Simulation1479->2084 over60.499s, pause0 throughout. Difficulty mismatch does
+not explain the browser failure. Do not repeat difficulty/pause/hold controls.
+Next use runtime input/API observations to trace order delivery/consumption,
+including any internal network path, against CLI; no proven network cause yet.

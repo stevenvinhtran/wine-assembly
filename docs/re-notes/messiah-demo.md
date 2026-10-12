@@ -104,3 +104,46 @@ the reset trigger and cached-device assignment/reference lifetime, and check
 whether documented display configuration avoids that path without guest patches.
 Evidence includes build log, exact patch, command, module hash and final image.
 Main test source retained at /home/user/main-0304-z16 in bx_yafdtfn8 snapshot.
+
+## Documented menu workaround succeeds (2026-10-12 06:45Z)
+
+Original readme documents +! as the Windows2000 menu workaround, also used
+by the supplied SafeMode batch. Run0645Z-messiah-menu-workaround changes
+only args from -i to -i +! on main0304a8549 plus Z16 correction. Build PASS;
+GetDirect3D at40c3a5 now returns0 throughout texture setup, and reviewed
+final.png shows the complete Messiah main menu.2177 batches/60.026s.
+This is an original supported launch option, not a guest code/state patch.
+The initial MCI informational warning still requires ordinary OK.
+
+0647Z short click at Play Game leaves main menu.0649Z Enter down600/up620
+advances to START GAME with NEW GAME selected; reviewed screenshot. Gameplay
+is not yet qualified. Next held Enter selects New Game, then ordinary movement.
+
+Local-only registration messiah-demo / messiah_demo adds -i +!, original
+300-file fixture instructions, and readme-derived touch controls.0652Z remote
+--prepare PASS; EXE SHA256 matches the original. Global corpus --dry-run
+stops at the pre-existing baldurs-gate-interactive-demo source/hash assertion
+before selected Messiah execution; not a passing whole-corpus test. Browser
+registration and actual touch gameplay remain to verify.
+
+0655Z second held Enter reaches SELECT DIFFICULTY, default Prophet.
+0657Z actual registered --app=messiah_demo route, third held Enter at1600,
+reaches rendered3D level/HUD.0659Z same registered route: before7000, Up down
+7020/up7220, walk7250, Right down7300/up7350, turn7400. Reviewed captures
+show movement toward the red door and a changed view, establishing ordinary
+CLI player input. Overlay FAILURE TO READ FROM AUDIO CD persists; do not
+claim audio works. Browser/touch/FPS remain separate validation.
+Registration f776e34ab plus formatting-only366593e6f pushed on
+codex/dr2-registration; apply both (final diff47lines). It depends on the
+Z16 fix3a4fcf883. Prepare299 data files plus original EXE, hash verified.
+
+0700Z registered Chrome155/WebGL/guest worker route: ordinary Enter closes
+MCI message and advances menu, held Enter selects New Game/Prophet. Reviewed
+before/walk/turn captures show actual keyboard-controlled movement.
+0705Z fresh browser at1000x800 with touch enabled, then844x390 viewport:
+reviewed phone-before/after and touch-input.json show actual CDP direction-pad
+up gesture3500ms moves character toward door. Touch controls visible.
+Core compatibility ready for review. No FPS/sound/physical-device/Safari or
+complete action-button qualification. Initial MCI audio-CD warning remains,
+and CLI displays FAILURE TO READ FROM AUDIO CD; separate follow-up needed.
+No desktop/public distribution or deployment.
