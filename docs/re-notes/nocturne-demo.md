@@ -142,3 +142,25 @@ prepare failed same missing directory, copy from original extraction fixed
 it (prepare-fixed.log). Earlier build absence similarly excluded generated
 files. These are test setup failures, not guest compatibility regressions.
 All successful run artifacts collected; evidence containment check clean.
+
+## 2026-10-12 11:33Z — Brightness works; presentation sample recorded
+
+1126Z-nocturne-gamma-perf, bx_vf7q3q2j, exact5e8f1716, Chrome155 worker/
+WebGL,844x390 mobile emulation, ordinary touch startup/walk/fire. Read-only
+gamma_ramp_gen/wa observed before/after10 discrete F11 and10 F12 keys
+(300ms down,200ms gap). All three generation/address0; selective gamma
+API tracing logs no matches. This does NOT imply brightness is broken.
+Reviewed bright10/dark10 and fixed static wall crop x200..579,y60..159:
+mean luminance1.745717->3.345841->1.745717. Original F11/F12 brightness
+therefore works without shared display-ramp updates; no gamma patch needed.
+Do not repeat the earlier inconclusive single-key brightness test.
+
+WinePerf.start({draw:false}) before2s warmup, then touch fire2s/walk2s plus
+6s observation. Presents30->180 over10.511285s =14.270377 presentations/s.
+Collector reports logicalFps:null: do not label the60Hz host animation loop
+or presentation rate as logical game FPS. Instrumented sample, no A/B or
+physical-device performance claim. Full snapshots/per-frame summary retained.
+No audio quality, real-device/Safari, jump or menu-return qualification yet.
+All artifacts collected; published reviewed evidence passes containment checks.
+Full fork preflight succeeded first try: original fixture copy, --prepare,
+rebuild/hash, Chrome install. Main0304 unchanged, integration ops-owned.
