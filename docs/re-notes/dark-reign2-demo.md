@@ -807,3 +807,31 @@ Initial0555Z attempt did not launch: fresh fork omitted test/binaries fixture.
 Restore original archive plus extractedFiles and run --prepare; successful0600Z
 is separate. Failed initial capture retained. Probe now checks HTTP status before
 waiting through the route. No public deploy, laptop HeroesII untouched.
+
+
+### Simulation gate mapping (2026-10-12 06:22Z)
+
+Static evidence: scratch/runs/20261012T0622Z-dr2-simulation-static/. Original
+PE addresses, no patched guest instructions or state. Function422690 toggles
+DWORD7f4d24;4226f0 sets both7f4d24 and7f4d20 to1 (single-step request).
+At42246e and4225e4, pause24!=0 with step20==0 skips incrementing7f4d78 and
+returns0 after422310. Otherwise7f4d78 increments and elapsed float7f4d7c
+is recomputed as counter*float7f4d88; pending step20 is cleared.
+422450 branches on4e7550, which tests DWORD8677bc, into a separate network
+clock/queue path. 422290 checks timing fields before calling422450.
+40a0f0 reads the imported clock through737158 and scales by double7ed200.
+Read-only browser samples of these fields follow; do not infer an active pause
+from the previous keyboard control alone.
+
+Run20261012T0625Z-dr2-simulation-samples actually started06:27:01Z and ended
+06:31:30Z on bx_yafdtfn8, Chrome155/WebGL/Threads,800x600. Module
+e246f5efe1dfc3e61515b94600f201e66000ef4ff89b42b8ae43b50cd22ded0d
+adds the Z16 correction to the retained source; not clean main or exactly the
+previous9e835f75 control. Read-only callGuest guest_read32 samples at order,
+10/30/60s give simulation counters1483,1585,1786,2088 with clocks205927,
+216100,236259,266407ms. Pause7f4d24 and single-step7f4d20 are0 throughout;
+page focused/visible. Float step7f4d88=0.1. Thus the simulation advances about
+10Hz normally: a globally paused/stopped simulation is not this run's blocker.
+Reviewed selected/after60 images retain formation and first objective despite
+green ground-order marker. Next trace movement-command enqueue/consumption
+and selected unit ownership/state against CLI; do not repeat clock/pause tests.

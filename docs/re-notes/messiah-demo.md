@@ -57,3 +57,50 @@ Reviewed final image remains white; no menu/gameplay qualification. Z-format
 error no longer appears after ordinary dismissal of MCI warning. Next test the
 documented -i (skip intro logos) and inspect render/assets if white persists;
 keep MCI empty-CD behavior separate. No known missing extracted payload.
+
+
+## Skip-intro control (2026-10-12 06:21Z)
+
+Run 20261012T0621Z-messiah-skip-intro uses the documented -i switch, ordinary
+MCI-warning acknowledgement, max25000 batches and60s wall bound. It completes
+4457 batches/60.001s,374284 API calls, exit0; reviewed final.png remains white.
+Module e246f5efe1dfc3e61515b94600f201e66000ef4ff89b42b8ae43b50cd22ded0d
+includes the Z16 correction on the retained test tree, not clean main.
+Skipping logos alone does not resolve the white frame. Next inspect rendering
+and asset use, or compare browser output; no menu/gameplay qualification.
+Fixture retained at /home/user/messiah-demo-preflight/game in bx_yafdtfn8.
+
+## Texture failure narrowed (06:32Z–06:35Z)
+
+0632Z-messiah-render-trace reaches1500 batches/18.566s,115440 APIs. White
+primary slot23; surface census has7 live surfaces, no normal menu textures.
+Repeated DrawPrimitive FVF244 from402c5e binds texture0. File tracing reads
+pc\\Interfce\\Menu\\new\\MMainPlayGame1.TGA successfully (0x4b32c bytes); initial
+missing cfg/inf are then created, and PC\\MESSIAH.SPT fallback succeeds. No
+required missing payload established by this trace.
+
+0634Z-messiah-texture-init captures full API sequence: device08140060 created
+API349, released2266; new device081400c8 created2288. Subsequent texture code
+still passes old08140060 to GetDirect3D at40c3a5, so it never reaches format
+enumeration/CreateSurface.0636Z-messiah-parent-result single-address trace
+confirms EAX0 before reset, EAX80004005 afterward at batches192,196–204.
+Caller40c3a5 branches out on negative result. This is a concrete failure, but
+not yet proof of an emulator lifetime bug: old interface use needs analysis.
+
+Reconciliation: retained remote D3D core differs from origin/main0304a8549.
+Main already includes dd75c48d3 GetDDInterface creator/reference fix; remote
+snapshot still uses the old global-return implementation. Next replay exact
+main plus Z16 correction before proposing another runtime change.
+
+Clean-main reconciliation replay0638Z: downloaded the GitHub archive pinned
+to0304a8549df15567b458d3a3c318609aa515e2ca into a separate remote directory,
+applied only3a4fcf883 Z16 patch, restored stdole2.tlb; all build gates PASS.
+Module3c3a4efe77335ac8af1719f435d222fc142b330f23ae234171ad42512588fb4d.
+60.005s/2696batches/364967APIs, exit0; reviewed image remains white. Same
+40c3a5 trace: first GetDirect3D returns0, after reset returns80004005 at
+batches192–204 on old device08221060. Main's existing fixes do not resolve
+this blocker. No new runtime fix inferred from stale-device use. Next inspect
+the reset trigger and cached-device assignment/reference lifetime, and check
+whether documented display configuration avoids that path without guest patches.
+Evidence includes build log, exact patch, command, module hash and final image.
+Main test source retained at /home/user/main-0304-z16 in bx_yafdtfn8 snapshot.
