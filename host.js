@@ -6906,6 +6906,10 @@ class WineAssembly {
             if (self.threadManager.drainCooperativeWakes) {
               const wakeStats = await self.threadManager.drainCooperativeWakes({
                 maxTotalSteps: recentInputWake ? (64 * 1024 * 1024) : (2 * 1024 * 1024),
+                // Match the audio worker budget across the whole wake drain;
+                // repeated notification slices must leave time for rendering.
+                maxWallMs: audioHot ? 4 : undefined,
+                quantumSteps: audioHot ? 10000 : undefined,
                 serviceLoadLibraries: () => self.handleCooperativeThreadLoadLibraries(),
               });
               if (perf && wakeStats) perf.countBlocks(wakeStats.blocks || 0);

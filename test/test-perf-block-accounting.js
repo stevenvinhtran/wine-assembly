@@ -51,6 +51,34 @@ async function main() {
     { steps: 200000, blocks: 8, threadsRun: 2 });
   assert.strictEqual((await wakeTm.drainCooperativeWakes()).blocks, 0, 'empty wake turns reset work');
 
+  let wakeNow = 0;
+  const bounded = manager({ now: () => wakeNow });
+  for (const handle of [1, 2]) bounded.threads.set(handle,
+    { state: 'active', instance: { exports: { get_yield_reason: () => 0 } } });
+  bounded._cooperativeWakeTargets = new Map([[1, 11], [2, 22]]);
+  const caps = [];
+  bounded.runSlice = (_, options) => {
+    caps.push(options.maxWallMs);
+    assert.strictEqual(options.quantumSteps, 10000);
+    wakeNow += 3;
+    return { steps: 100000, blocks: 4, threadsRun: 1 };
+  };
+  const boundedStats = await bounded.drainCooperativeWakes({
+    maxTotalSteps: 64 * 1024 * 1024, maxWallMs: 4, quantumSteps: 10000,
+  });
+  assert.strictEqual(boundedStats.threadsRun, 2, 'one deadline spans all wake slices');
+  assert.deepStrictEqual(caps, [4, 1], 'each slice receives only the remaining time');
+  assert.deepStrictEqual([...bounded._cooperativeWakeTargets], [[1, 11], [2, 22]],
+    'unfinished and unvisited waiters survive until the next turn');
+  bounded.threads.get(1).ioFill = new Promise(() => {});
+  bounded.runSlice = () => ({ steps: 0, blocks: 0, threadsRun: 0 });
+  await bounded.drainCooperativeWakes({ maxWallMs: 4 });
+  assert.deepStrictEqual([...bounded._cooperativeWakeTargets], [[1, 11]],
+    'pending audio I/O does not hold the render loop until the network responds');
+  bounded.threads.get(1).ioFill = null;
+  await bounded.drainCooperativeWakes({ maxWallMs: 4 });
+  assert.strictEqual(bounded._cooperativeWakeTargets.size, 0, 'idle waiters retire normally');
+
   for (const serialSlices of [false, true]) {
     const workerTm = manager({ workerBackend: { dropThread() {} }, serialSlices });
     const replies = [7, 0];

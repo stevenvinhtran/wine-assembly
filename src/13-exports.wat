@@ -704,6 +704,24 @@
   (func (export "get_heap_end") (result i32) (global.get $heap_end))
   (func (export "get_heap_sparse_ptr") (result i32) (global.get $heap_sparse_ptr))
   (func (export "get_heap_sparse_end") (result i32) (global.get $heap_sparse_end))
+  ;; Cooperative slot reuse transfers ownership only after the old thread has
+  ;; exited. Keep arena records and both free lists with their private cursors;
+  ;; copying just the cursors would lose frees or mischarge live allocations.
+  (func (export "get_heap_arena_record") (result i32) (global.get $heap_arena_record))
+  (func (export "get_heap_sparse_record") (result i32) (global.get $heap_sparse_record))
+  (func (export "get_heap_large_free") (result i32) (global.get $heap_large_free))
+  (func (export "adopt_heap_state")
+    (param $ptr i32) (param $end i32) (param $record i32)
+    (param $sparse_ptr i32) (param $sparse_end i32) (param $sparse_record i32)
+    (param $free i32) (param $large_free i32)
+    (global.set $heap_ptr (local.get $ptr))
+    (global.set $heap_end (local.get $end))
+    (global.set $heap_arena_record (local.get $record))
+    (global.set $heap_sparse_ptr (local.get $sparse_ptr))
+    (global.set $heap_sparse_end (local.get $sparse_end))
+    (global.set $heap_sparse_record (local.get $sparse_record))
+    (global.set $free_list (local.get $free))
+    (global.set $heap_large_free (local.get $large_free)))
   ;; Publish the process heap base + chunk cursor. The PE loader calls the same
   ;; function; exported so a harness can set a heap up without a real image.
   (func (export "heap_init") (param i32) (call $heap_init (local.get 0)))

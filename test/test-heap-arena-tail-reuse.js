@@ -47,5 +47,40 @@ const assert=require('assert'),fs=require('fs'),{compileSrcWasm}=require('./comp
   assert.strictEqual(a.get_free_list(),0,'current low tail not duplicated on free list');
   assert.strictEqual(a.guest_alloc(28)>>>0,tail+4,'small allocation still consumes retained low tail');count++;
  }
- console.log('Heap arena tail reuse PASS '+count+' cases, public exports only');
+ // MBAACC creates more than 1,024 short-lived loader threads. Replacing the
+ // WASM instance must not spend a new private heap arena for every TLS vector.
+ // Exercise the actual ThreadManager handoff, retaining a live guest block
+ // across all replacements and checking both small-bin and large-list reuse.
+ for (const sparse of [false, true]) {
+  const {a, memory} = await boot(sparse);
+  const {ThreadManager} = require('../lib/thread-manager');
+  const host = {memory};
+  for (const [n,s] of Object.entries(sigs)) host[n] = s.results?.length ? () => 0 : () => {};
+  const tm = new ThreadManager(module, memory, {exports:a}, () => ({host}), {});
+  tm._log = () => {};
+  let live = 0, small = 0, large = 0;
+  for (let i = 0; i < 1040; i++) {
+   const handle = tm.createThread(0x401000, 0, 0x10000, 0);
+   assert(handle, 'replacement loader thread is created');
+   if (small) assert.strictEqual(tm._pendingThreads[0].heapState[6] >>> 0,
+    small - 4, 'small-bin free block transfers before TLS consumes it');
+   tm.spawnPending();
+   const thread = tm.threads.get(handle), e = thread.instance.exports;
+   if (!live) { live = e.guest_alloc(64) >>> 0; assert(live); e.guest_write32(live, 0x1234abcd); }
+   assert.strictEqual(e.guest_read32(live) >>> 0, 0x1234abcd, 'live allocation survives handoff');
+   const nextSmall = e.guest_alloc(128) >>> 0;
+   assert(nextSmall, 'small allocation survives loader churn');
+   small = nextSmall; e.guest_free(small);
+   const nextLarge = e.guest_alloc(2 * 1024 * 1024) >>> 0;
+   assert(nextLarge, 'large allocation survives loader churn');
+   if (large) assert.strictEqual(nextLarge, large, 'large free block transfers');
+   large = nextLarge; e.guest_free(large);
+   thread.state = 'exited';
+  }
+  const arenas = new DataView(memory.buffer).getUint32(regions.BASE.HEAP_ARENAS, true);
+  assert(arenas < 16, `loader churn must reuse arenas, got ${arenas}`);
+  assert(a.guest_alloc(262248), 'battle texture allocation still succeeds');
+  count++;
+ }
+ console.log('Heap arena tail reuse PASS '+count+' cases, including 2,080 loader threads');
 })().catch(e=>{console.error(e);process.exitCode=1;});

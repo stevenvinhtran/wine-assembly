@@ -64,6 +64,45 @@ one-shot. Tests cover both paths against the real audio host.
 
 ## Current validation boundary
 
+### Browser log: heap exhaustion on entering battle (2026-10-12)
+
+The user's `Desktop/log.txt` contains 1,065 spawned loader threads. At line
+3,626 it begins reporting reason-4 heap failures, followed by refused
+262,248-byte allocations and eventually even 24-byte allocations. The old
+reason-4 label incorrectly said `MAX_VIRTUAL_MAPS`; the call site is actually
+`heap_arena_register` failing against the 1,024-entry `HEAP_ARENAS` table.
+
+Each cooperative replacement instantiated a fresh WASM module and allocated
+its TLS vector in a new private arena, abandoning the previous instance's
+remaining arena capacity and free lists. On slot reuse, ThreadManager now
+transfers the exited instance's low/sparse cursors, arena records and both
+free lists to its replacement, before TLS allocation. Small-block bins are
+flushed first and ownership is removed from the old instance. Live guest
+allocations remain valid. This handoff is limited to exited cooperative
+threads; it does not share allocator cursors between concurrently live threads
+or change the real Worker backend.
+
+`test-heap-arena-tail-reuse.js` exercises 1,040 replacements in each of the low
+and sparse heap configurations through the real ThreadManager and compiled
+WASM. It checks retained live bytes, small/large free-list transfer, bounded
+arena count and a subsequent battle-sized allocation. All 13 cases pass.
+Build evidence: `scratch/mbaa-heap-build.log`; test evidence:
+`scratch/mbaa-heap-reuse-test.log`. The user reports substantially improved
+gameplay with this change, but also new edge-case crashes; their crash log is
+still needed to diagnose those separately.
+
+### Music wake budget
+
+`drainCooperativeWakes` previously renewed a 12 ms slice budget inside a loop
+that could spend 64 million interpreter steps after input. The browser now
+gives an audio-active wake drain one shared 4 ms deadline and 10,000-step
+quanta. Unfinished/unvisited wake targets survive for the next turn; pending
+audio provider reads no longer hold that bounded drain until network arrival.
+This is a cooperative deadline checked between quanta, not a hard execution
+time guarantee. Deterministic tests cover deadline sharing, retained targets,
+pending I/O and eventual idle completion. Browser FPS improvement has not been
+measured, and music decoding itself still consumes interpreter CPU.
+
 The full WATX build passes, as do the focused scheduler, wait, positional-read,
 DirectSound cursor, ring-wrap, and notification tests. A short headless MBAACC
 run reaches only the blank 640x480 startup surface and eagerly mounts files, so
