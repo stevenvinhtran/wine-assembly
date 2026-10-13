@@ -598,6 +598,51 @@ assert.strictEqual(budgetRuns, 2, 'budgeted scheduler should stop after crossing
 assert.strictEqual(budgetStats.hitDeadline, true, 'budgeted scheduler should report deadline stops');
 assert.strictEqual(budgetStats.steps, 200, 'budgeted scheduler should report approximate executed steps');
 
+// audioThreadStepMs: a thread that has streamed audio gets at most N wall ms
+// per host step (MBAACC's music decoder); other workers keep the whole budget.
+function makeAudioCapScenario(capMs) {
+  let clock = 0;
+  const tm = makeThreadManager({ audioThreadStepMs: capMs, waitNow: () => 0 });
+  tm._now = () => clock;
+  const runs = { audio: 0, loader: 0 };
+  tm.threads.set(0xe1000, makeRunnableThread(1, () => { runs.audio++; clock += 1; }));
+  tm.threads.set(0xe1004, makeRunnableThread(2, () => { runs.loader++; clock += 1; }));
+  tm.markAudioThread(1, 250);
+  return { tm, runs, advance: ms => { clock += ms; } };
+}
+{
+  const { tm, runs, advance } = makeAudioCapScenario(2);
+  advance(1000);  // the timed "hot" window has expired; the cap still applies
+  tm.beginAudioStep();
+  tm.runBudgeted({ quantumSteps: 100, maxTotalSteps: 1000, maxWallMs: 100 });
+  assert.strictEqual(runs.audio, 2, 'capped audio thread stops after its per-step wall allowance');
+  assert.strictEqual(runs.loader, 10, 'non-audio workers keep every slice of the budget');
+  tm.beginAudioStep();
+  tm.runBudgeted({ quantumSteps: 100, maxTotalSteps: 100, maxWallMs: 100 });
+  assert.strictEqual(runs.audio, 3, 'the next host step renews the audio allowance');
+
+  // A wake for an exhausted audio thread survives to the next step.
+  tm.runBudgeted({ quantumSteps: 100, maxTotalSteps: 200, maxWallMs: 100 });
+  const audioRunsBefore = runs.audio;
+  tm._cooperativeWakeTargets = new Map([[0xe1000, 0x1234]]);
+  tm._audioStepLeftMs = 0;
+  // The exhausted path returns before the drain's first await.
+  tm.drainCooperativeWakes({ maxWallMs: 4 });
+  assert.strictEqual(runs.audio, audioRunsBefore, 'an exhausted audio thread is not run by the wake drain');
+  assert.strictEqual(tm._cooperativeWakeTargets.get(0xe1000), 0x1234,
+    'the wake is kept for the next step rather than dropped');
+
+  tm._markThreadExited(0xe1000, tm.threads.get(0xe1000), 0, 'test');
+  assert.strictEqual(tm._streamingAudioTids.has(1), false,
+    'thread exit releases the audio cap so a reused tid starts uncapped');
+}
+{
+  const { tm, runs } = makeAudioCapScenario(0);
+  tm.beginAudioStep();
+  tm.runBudgeted({ quantumSteps: 100, maxTotalSteps: 1000, maxWallMs: 100 });
+  assert.strictEqual(runs.audio, 10, 'without audioThreadStepMs the audio thread is uncapped');
+}
+
 const messageTm = makeThreadManager();
 messageTm._hasMessage = () => true;
 let messageRuns = 0;
@@ -873,6 +918,7 @@ console.log('PASS  ThreadManager reuses exited worker cache slots');
 console.log('PASS  ThreadManager schedules, suspends and resumes worker slices');
 console.log('PASS  ThreadManager supports wall-budgeted worker slices');
 console.log('PASS  ThreadManager prioritizes hot audio threads');
+console.log('PASS  ThreadManager caps streaming-audio threads per host step');
 console.log('PASS  ThreadManager notifies thread exits once');
 console.log('PASS  ThreadManager completes nested infinite waits without losing callback state');
 console.log('PASS  ThreadManager keeps pending worker handles unsignaled');

@@ -1137,6 +1137,10 @@ class WineAssembly {
     // asyncMultimediaTimer at all (Jardinains' menu froze). An app opts out
     // with `mmTimerThread: false` in lib/apps.js; ?mm-thread=0 for one load.
     this.mmTimerThread = true;
+    // Cooperative per-step wall cap (ms) for threads that stream audio; 0 is
+    // off. `audioThreadStepMs` in lib/apps.js, ?audio-step-ms=N for one load
+    // (0 disables). See ThreadManager.audioThreadStepMs.
+    this.audioThreadStepMs = 0;
     // Decode-time x87 fusion is on by default. An app opts out with
     // `x87Fusion: false` in lib/apps.js (browser-shell copies it here), and the
     // page opts out with ?no-x87-fold or the debug toolbar box.
@@ -3021,6 +3025,7 @@ class WineAssembly {
       const q = new URLSearchParams(location.search);
       if (q.has('mm-thread')) this.mmTimerThread = q.get('mm-thread') !== '0';
       if (q.has('async-mm')) this.asyncMultimediaTimer = q.get('async-mm') !== '0';
+      if (q.has('audio-step-ms')) this.audioThreadStepMs = Math.max(0, Number(q.get('audio-step-ms')) || 0);
     } catch (_) {}
     // Process-wide (shared memory), so the main instance setting it reaches a
     // guest Worker too; set before any guest code can call timeSetEvent.
@@ -3153,6 +3158,7 @@ class WineAssembly {
       workerBackend: this.guestWorker || null,
       // Spawned guest threads take the app's NULL-guard-page rule too.
       faultUnmapped: this.nullPageFaults ? 4 : 0,
+      audioThreadStepMs: this.audioThreadStepMs,
       threadsRequested: !!(typeof window !== 'undefined' && window.WINE_THREADS),
       // So a trapped thread's EIP prints as a module and an offset. In worker
       // mode a DLL's load address depends on load order, so the raw number is
@@ -6910,6 +6916,7 @@ class WineAssembly {
             // active workers enough total steps to use that budget.
             const audioHot = self._isAudioHot();
             const menuOpen = self._hasOpenMenu();
+            if (self.threadManager.beginAudioStep) self.threadManager.beginAudioStep();
             if (self.threadManager.drainCooperativeWakes) {
               const wakeStats = await self.threadManager.drainCooperativeWakes({
                 maxTotalSteps: recentInputWake ? (64 * 1024 * 1024) : (2 * 1024 * 1024),
