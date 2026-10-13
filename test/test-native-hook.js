@@ -99,5 +99,24 @@ const ITER = 300;
   assert.strictEqual(hook.calls, 0, 'disarmed again: host not asked');
   assert.strictEqual(r.esi, ITER * 0x77, 'disarmed again: F result');
 
-  console.log(`native hook PASS: ${ITER} calls x 3 answered passes, declined and disarmed paths`);
+  // A cooperative guest thread inherits the hook: MBAACC's fill runs on its
+  // music thread, and an unlisted setter was silently not passed on.
+  const { ThreadManager } = require('../lib/thread-manager');
+  e.set_native_hook_eip(F);
+  const tm = new ThreadManager(module, memory, { exports: e }, () => {
+    const tctx = { exports: null, getMemory: () => memory.buffer, nativeHook: ctx.nativeHook };
+    const ti = createHostImports(tctx);
+    Object.assign(ti.host, { memory, log: () => {}, log_i32: () => {}, exit: () => {},
+      wait_multiple: () => 0, terminate_thread: () => 0 });
+    ti.__setInstance = inst => { tctx.exports = inst.exports; };
+    return ti;
+  }, {});
+  tm._log = () => {};
+  tm.recordInheritedWasmGlobal('set_native_hook_eip', F);
+  const handle = tm.createThread(code, 0, 0x10000, 0);
+  tm.spawnPending();
+  const te = tm.threads.get(handle).instance.exports;
+  assert.strictEqual(te.get_native_hook_eip() >>> 0, F, 'spawned thread has the hook armed');
+
+  console.log(`native hook PASS: ${ITER} calls x 3 answered passes, declined and disarmed paths, inherited by threads`);
 })().catch(err => { console.error(err); process.exitCode = 1; });
