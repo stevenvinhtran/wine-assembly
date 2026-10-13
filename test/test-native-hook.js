@@ -1,5 +1,5 @@
 'use strict';
-// $native_hook_eip: a guest function entry the host may answer.
+// $native_hook0..3: guest function entries the host may answer.
 //
 // A caller loops 300 times over `push 3/2/1; mov eax,5; call F; add esi,eax`.
 // F marks memory, returns 0x77 and pops its three arguments (ret 0xc). With
@@ -77,7 +77,8 @@ const ITER = 300;
   assert.strictEqual(hook.calls, 0, 'disarmed: host never asked');
 
   // Armed and answered: F is never entered, cold or hot.
-  e.set_native_hook_eip(F);
+  e.set_native_hook(2, code + 0xf0);   // another armed slot that is never reached
+  e.set_native_hook(0, F);
   for (const pass of [1, 2, 3]) {
     hook.calls = 0;
     r = run(`answered pass ${pass}`);
@@ -94,7 +95,7 @@ const ITER = 300;
   assert.strictEqual(r.marked, 0xdead, 'declined: F body ran');
 
   // Disarmed again after hot runs.
-  hook.answer = true; e.set_native_hook_eip(0); hook.calls = 0;
+  hook.answer = true; e.set_native_hook(0, 0); hook.calls = 0;
   r = run('disarmed again');
   assert.strictEqual(hook.calls, 0, 'disarmed again: host not asked');
   assert.strictEqual(r.esi, ITER * 0x77, 'disarmed again: F result');
@@ -102,7 +103,7 @@ const ITER = 300;
   // A cooperative guest thread inherits the hook: MBAACC's fill runs on its
   // music thread, and an unlisted setter was silently not passed on.
   const { ThreadManager } = require('../lib/thread-manager');
-  e.set_native_hook_eip(F);
+  e.set_native_hook(1, F);
   const tm = new ThreadManager(module, memory, { exports: e }, () => {
     const tctx = { exports: null, getMemory: () => memory.buffer, nativeHook: ctx.nativeHook };
     const ti = createHostImports(tctx);
@@ -112,11 +113,14 @@ const ITER = 300;
     return ti;
   }, {});
   tm._log = () => {};
-  tm.recordInheritedWasmGlobal('set_native_hook_eip', F);
+  tm.recordInheritedWasmGlobal('set_native_hook', 1, F);
+  tm.recordInheritedWasmGlobal('set_native_hook', 3, F + 0x10);
   const handle = tm.createThread(code, 0, 0x10000, 0);
   tm.spawnPending();
   const te = tm.threads.get(handle).instance.exports;
-  assert.strictEqual(te.get_native_hook_eip() >>> 0, F, 'spawned thread has the hook armed');
+  assert.strictEqual(te.get_native_hook(1) >>> 0, F, 'spawned thread has slot 1 armed');
+  assert.strictEqual(te.get_native_hook(3) >>> 0, F + 0x10, 'spawned thread has slot 3 armed');
+  assert.strictEqual(te.get_native_hook(0) >>> 0, 0, 'unrecorded slot stays empty');
 
   console.log(`native hook PASS: ${ITER} calls x 3 answered passes, declined and disarmed paths, inherited by threads`);
 })().catch(err => { console.error(err); process.exitCode = 1; });

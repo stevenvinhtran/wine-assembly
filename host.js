@@ -1144,10 +1144,14 @@ class WineAssembly {
     // Fine QueryPerformanceCounter (see $qpc_fine): `fineQpc: true` in
     // lib/apps.js, ?fine-qpc[=0] for one load.
     this.fineQpc = false;
-    // Native answer for a game's Ogg Vorbis fill routine (lib/native-vorbis-fill.js):
-    // `nativeVorbisFill: {eip, ...}` in lib/apps.js, ?native-vorbis=0 to disable.
-    this.nativeVorbisFill = null;
-    this._nativeVorbis = null;
+    // Guest function entries answered natively ($native_hook0..3):
+    // `nativeHooks: [{kind, va, module?, ...}]` in lib/apps.js. Kinds:
+    // 'vorbis-fill' (lib/native-vorbis-fill.js) and 'd3dx-encode-a8r8g8b8'
+    // (lib/native-d3dx-encode.js). ?native-hooks=0 disables all of them,
+    // ?native-vorbis=0 / ?native-d3dx=0 one kind. Armed after DLL load.
+    this.nativeHooks = null;
+    this._nativeHookByEip = new Map();
+    this._nativeHookHandlers = [];
     // Decode-time x87 fusion is on by default. An app opts out with
     // `x87Fusion: false` in lib/apps.js (browser-shell copies it here), and the
     // page opts out with ?no-x87-fold or the debug toolbar box.
@@ -1794,7 +1798,10 @@ class WineAssembly {
       // their fixed-table slots instead of leaking until creation fails.
       closeSyncHandle: handle => self._closeSyncHandle(handle),
       // $native_hook_eip: answered against the calling thread's own exports.
-      nativeHook: (eip, ex) => !!(self._nativeVorbis && self._nativeVorbis.hook(eip, ex)),
+      nativeHook: (eip, ex) => {
+        const handler = self._nativeHookByEip.get(eip >>> 0);
+        return !!(handler && handler.hook(eip, ex));
+      },
       signalSyncHandle: handle => self.threadManager
         ? self.threadManager.setEvent(handle >>> 0) : 0,
       resetSyncHandle: handle => self.threadManager
@@ -3001,19 +3008,6 @@ class WineAssembly {
       if (q.has('fine-qpc')) this.fineQpc = q.get('fine-qpc') !== '0';
     } catch (_) {}
     if (this.instance.exports.set_qpc_fine) this.instance.exports.set_qpc_fine(this.fineQpc ? 1 : 0);
-    try {
-      if (new URLSearchParams(location.search).get('native-vorbis') === '0') this.nativeVorbisFill = null;
-    } catch (_) {}
-    // Cooperative only: the hook reads and writes the calling thread's
-    // registers through its exports, which a Worker-backed thread keeps.
-    if (this.nativeVorbisFill && !this.guestWorker && this.instance.exports.set_native_hook_eip &&
-        typeof NativeVorbisFill === 'function') {
-      this._nativeVorbis = new NativeVorbisFill(this.nativeVorbisFill, {
-        getBuffer: () => this.memory.buffer,
-        log: msg => this.logToUI(msg),
-      });
-      this.instance.exports.set_native_hook_eip(this.nativeVorbisFill.eip >>> 0);
-    }
     // The micro-op tier (07d/07e). Not decode-time: a hot head is compiled on
     // its 256th entry whenever the tier is on, and turning it off flushes every
     // program, so setUop() below can flip it on a running app too.
@@ -3252,9 +3246,6 @@ class WineAssembly {
     }
     this.threadManager.recordInheritedWasmGlobal('set_cpu_sse', cpuSSE);
     this.threadManager.recordInheritedWasmGlobal('set_qpc_fine', this.fineQpc ? 1 : 0);
-    if (this._nativeVorbis) {
-      this.threadManager.recordInheritedWasmGlobal('set_native_hook_eip', this.nativeVorbisFill.eip >>> 0);
-    }
     this.threadManager.recordInheritedWasmGlobal('set_present_cap', presentCap);
     this.threadManager.recordInheritedWasmGlobal('set_present_pace_mode',
       this.presentPace === 'deadline' ? 0 : 1);
@@ -4349,6 +4340,7 @@ class WineAssembly {
       const entryCaller = (typeof DllLoader !== 'undefined' && DllLoader.callDllMain) || null;
       this.threadManager.setLoadedDlls(results, entryCaller);
     }
+    this._armNativeHooks();
     this._inDllInit = false;
     this.running = true;
   }
@@ -4572,6 +4564,43 @@ class WineAssembly {
     // just mapped is invisible to every main-thread host import that walks the
     // DLL table until main's count catches up.
     await this._publishLinkLoaderState(link);
+  }
+
+  // Arm the app's native hooks ($native_hook0..3) once every static DLL has a
+  // load address. Cooperative only: a handler reads and writes the calling
+  // thread's registers through its exports, which a Worker-backed thread keeps.
+  _armNativeHooks() {
+    const ex = this.instance && this.instance.exports;
+    if (!Array.isArray(this.nativeHooks) || this.guestWorker || !ex || !ex.set_native_hook) return;
+    let q = null;
+    try { q = new URLSearchParams(location.search); } catch (_) {}
+    if (q && q.get('native-hooks') === '0') return;
+    const off = { 'vorbis-fill': 'native-vorbis', 'd3dx-encode-a8r8g8b8': 'native-d3dx' };
+    const make = {
+      'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'd3dx-encode-a8r8g8b8': cfg => typeof NativeD3DXEncode === 'function' && new NativeD3DXEncode(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+    };
+    let slot = 0;
+    for (const cfg of this.nativeHooks) {
+      if (slot > 3 || !cfg || !make[cfg.kind]) continue;
+      if (q && q.get(off[cfg.kind]) === '0') continue;
+      let eip = cfg.va >>> 0;
+      if (cfg.module) {
+        const m = this.moduleBases && this.moduleBases[String(cfg.module).toLowerCase()];
+        if (!m) { this.logToUI(`[native-hook] ${cfg.kind}: ${cfg.module} is not loaded`); continue; }
+        eip = (m.loadAddr + (eip - m.origBase)) >>> 0;
+      }
+      const handler = make[cfg.kind](Object.assign({}, cfg, { eip }));
+      if (!handler) continue;
+      ex.set_native_hook(slot, eip);
+      if (this.threadManager) this.threadManager.recordInheritedWasmGlobal('set_native_hook', slot, eip);
+      this._nativeHookByEip.set(eip, handler);
+      this._nativeHookHandlers.push(handler);
+      this.logToUI(`[native-hook] ${cfg.kind} at 0x${eip.toString(16)} (slot ${slot})`);
+      slot++;
+    }
   }
 
   // Remember where an image landed, and resolve an address back to it.

@@ -311,10 +311,9 @@
         (then
           (if (call $fast_msvc_sbh_scan)
             (then (br $main)))))
-      ;; A host-answered function entry ($native_hook_eip). On 1 the host has
+      ;; A host-answered function entry ($native_hook0..3). On 1 the host has
       ;; already returned to the caller; on 0 the guest code runs below.
-      (if (i32.and (i32.ne (global.get $native_hook_eip) (i32.const 0))
-                   (i32.eq (global.get $eip) (global.get $native_hook_eip)))
+      (if (call $native_hook_at (global.get $eip))
         (then
           (if (call $host_native_hook (global.get $eip))
             (then (br $main)))))
@@ -417,6 +416,9 @@
   (func (export "get_esp") (result i32) (i32.load offset=16 (global.get $reg_base)))
   (func (export "get_eax") (result i32) (i32.load offset=0 (global.get $reg_base)))
   (func (export "get_ecx") (result i32) (i32.load offset=4 (global.get $reg_base)))
+  ;; The x87 control word, for host-answered routines that save it as the
+  ;; guest code would (lib/native-d3dx-encode.js).
+  (func (export "get_fpu_cw") (result i32) (global.get $fpu_cw))
   (func (export "get_edx") (result i32) (i32.load offset=8 (global.get $reg_base)))
   (func (export "get_ebx") (result i32) (i32.load offset=12 (global.get $reg_base)))
   (func (export "get_ebp") (result i32) (i32.load offset=20 (global.get $reg_base)))
@@ -1987,12 +1989,32 @@
   (func (export "get_spin_deadline_ms") (result i32) (global.get $spin_deadline_ms))
   ;; Fine QueryPerformanceCounter (see $qpc_fine). Per instance, so the host
   ;; also records it as an inherited global for guest threads.
-  ;; Arm (or with 0 disarm) the host-answered function entry. Bumping the
-  ;; chain epoch kills every chain patched before, as $sbh_note_candidate does.
-  (func (export "set_native_hook_eip") (param $eip i32)
-    (global.set $native_hook_eip (local.get $eip))
-    (call $chain_bump))
-  (func (export "get_native_hook_eip") (result i32) (global.get $native_hook_eip))
+  ;; Arm (or with 0 disarm) host-answered function entry $slot (0..3). Bumping
+  ;; the chain epoch kills every chain patched before, as $sbh_note_candidate
+  ;; does.
+  (func (export "set_native_hook") (param $slot i32) (param $eip i32)
+    (block $done
+      (br_if $done (i32.gt_u (local.get $slot) (i32.const 3)))
+      (if (i32.eqz (local.get $slot)) (then (global.set $native_hook0 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 1)) (then (global.set $native_hook1 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 2)) (then (global.set $native_hook2 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 3)) (then (global.set $native_hook3 (local.get $eip))))
+      (call $chain_bump)))
+  (func (export "get_native_hook") (param $slot i32) (result i32)
+    (select (global.get $native_hook0)
+      (select (global.get $native_hook1)
+        (select (global.get $native_hook2) (global.get $native_hook3)
+          (i32.eq (local.get $slot) (i32.const 2)))
+        (i32.eq (local.get $slot) (i32.const 1)))
+      (i32.eqz (local.get $slot))))
+  ;; Is $eip a nonzero armed native-hook entry?
+  (func $native_hook_at (param $eip i32) (result i32)
+    (i32.and (i32.ne (local.get $eip) (i32.const 0))
+      (i32.or
+        (i32.or (i32.eq (local.get $eip) (global.get $native_hook0))
+                (i32.eq (local.get $eip) (global.get $native_hook1)))
+        (i32.or (i32.eq (local.get $eip) (global.get $native_hook2))
+                (i32.eq (local.get $eip) (global.get $native_hook3))))))
   (func (export "set_qpc_fine") (param $on i32)
     (global.set $qpc_fine (i32.ne (local.get $on) (i32.const 0))))
   (func (export "get_qpc_fine_period_us") (result i32) (i32.wrap_i64 (global.get $qpc_fine_period)))

@@ -915,7 +915,7 @@
                   (then
                     (if (i32.eqz (i32.or (i32.or (i32.eq (global.get $eip) (global.get $sbh_eip_a))
                                                  (i32.eq (global.get $eip) (global.get $sbh_eip_b)))
-                                         (i32.eq (global.get $eip) (global.get $native_hook_eip))))
+                                         (call $native_hook_at (global.get $eip))))
                       (then
                         (local.set $nx_t (call $page_resolve (global.get $eip)))
                         ;; Under $uop_fast only a no-bump target (bit 0) may

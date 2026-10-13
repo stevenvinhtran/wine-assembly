@@ -5729,16 +5729,17 @@
               (then
                 (local.set $side (i32.const 1))
                 (br $done)))))
-        ;; The same side exit for a host-answered entry ($native_hook_eip),
+        ;; The same side exit for a host-answered entry ($native_hook0..3),
         ;; so $run sees it however the region reached it.
-        (if (global.get $native_hook_eip)
+        (if (i32.or (i32.or (global.get $native_hook0) (global.get $native_hook1))
+                    (i32.or (global.get $native_hook2) (global.get $native_hook3)))
           (then
             (local.set $exit_eip
               (i32.load offset=48
                 (i32.add (local.get $BR)
                   (i32.mul (local.get $next_b)
                     (i32.shl (global.get $REGION_BLOCK_WORDS) (i32.const 2))))))
-            (if (i32.eq (local.get $exit_eip) (global.get $native_hook_eip))
+            (if (call $native_hook_at (local.get $exit_eip))
               (then
                 (local.set $side (i32.const 1))
                 (br $done)))))
