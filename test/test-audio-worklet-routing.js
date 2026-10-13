@@ -35,7 +35,7 @@ const ok = (cond, label) => {
 };
 
 // ---- stubs that COUNT what gets constructed --------------------------------
-const counters = { workletNodes: 0, bufferSources: 0, addModule: 0 };
+const counters = { workletNodes: 0, bufferSources: 0, addModule: 0, decodedFrames: 0 };
 
 class FakeParam { constructor(v = 0) { this.value = v; } }
 class FakeNode {
@@ -44,6 +44,7 @@ class FakeNode {
 }
 class FakeBuffer {
   constructor(ch, len, rate) {
+    counters.decodedFrames += ch * len;
     this.numberOfChannels = ch; this.length = len; this.sampleRate = rate;
     this.duration = len / rate;
     this.data = Array.from({ length: ch }, () => new Float32Array(len));
@@ -182,8 +183,16 @@ async function settleModule(ctx) {
 
     await settleModule(ctx);
 
-    host.voice_play_ring(id, PTR, RING, 0, 1);
-    ok(counters.workletNodes === 1, 'once the module is ready the looping ring gets a worklet node');
+    // A cooperative game's streaming mixer calls Unlock, not Play again,
+    // after the lazily loaded module becomes ready. It must promote on that
+    // refresh even though no guest Worker set ctx.liveAudioRing.
+    const fallbackSources = counters.bufferSources;
+    const fallbackFrames = counters.decodedFrames;
+    ctx._voices._ac.currentTime += 0.025;
+    const cursorBeforePromotion = host.voice_get_pos(id);
+    host.voice_play_ring(id, PTR, RING, 0, 2);
+    ok(counters.workletNodes === 1, 'the first cooperative Unlock after module load promotes the ring');
+    ok(counters.bufferSources === fallbackSources, 'promotion does not decode and splice another full ring');
     const v = ctx._voices._map[id];
     ok(v.workletNode && Number.isInteger(v.workletSlot), 'the voice records its node and slot');
     ok(v.workletNode.processorName === 'wine-voice', 'it is the wine-voice processor');
@@ -203,6 +212,10 @@ async function settleModule(ctx) {
     const router = ctx.sharedAudio.voiceWorkletRouter;
     const i32 = new Int32Array(router.controlBuffer);
     const base = v.workletSlot * router.DESC.STRIDE;
+    ok(i32[base + router.DESC.START_BYTE] === cursorBeforePromotion,
+      'promotion continues from the current cursor without restarting the song');
+    ok(counters.decodedFrames === fallbackFrames,
+      'promotion plus twenty Unlocks allocate ZERO additional decoded PCM frames');
     Atomics.store(i32, base + router.DESC.CURSOR, 777);
     ok(host.voice_get_pos(id) === 777,
       'GetCurrentPosition reports the cursor the WORKLET published, not one derived from a clock');

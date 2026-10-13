@@ -103,6 +103,29 @@ time guarantee. Deterministic tests cover deadline sharing, retained targets,
 pending I/O and eventual idle completion. Browser FPS improvement has not been
 measured, and music decoding itself still consumes interpreter CPU.
 
+### Cooperative AudioWorklet promotion (2026-10-12)
+
+The user reports that the wake-budget change did not resolve music lag.
+An additional host-side defect was reproduced in `test-audio-worklet-routing.js`:
+the first looping Play starts the lazy worklet module load and falls back to
+an AudioBufferSource. Once loading completes, cooperative Unlock calls never
+promoted that source because the promotion branch required `ctx.liveAudioRing`,
+a flag set only after a real guest Worker starts. Until another Play, every
+Unlock decoded/copied the full ring and constructed a replacement source.
+
+Promotion now uses the router's existing shared-memory, loop, capability and
+opt-out checks in either scheduler. The test uses the actual audio host and a
+delayed module-load stub; it fails before this change and passes afterwards.
+Promotion plus 20 refreshes allocate no additional decoded PCM frames or
+BufferSources, and preserve the play cursor. Notification and looping/one-shot
+cursor tests also pass. Evidence is in `scratch/mbaa-audio-promotion-before.log`
+and `scratch/mbaa-audio-promotion-after.log`. The connected browser initially
+had no running guest; after launch it reported a suspended AudioContext and
+no playing voices. A bounded 20-second sample through the existing profiling
+hook recorded no audio events or guest frames and restored its settings.
+Consequently this establishes removed host audio work, not a measured gameplay
+FPS improvement. The user confirms the lag affects both select and battle.
+
 The full WATX build passes, as do the focused scheduler, wait, positional-read,
 DirectSound cursor, ring-wrap, and notification tests. A short headless MBAACC
 run reaches only the blank 640x480 startup surface and eagerly mounts files, so
