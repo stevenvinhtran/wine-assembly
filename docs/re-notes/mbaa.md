@@ -185,3 +185,42 @@ it does not reproduce browser lazy loading or scene transitions. The remaining
 questions require manual browser reproduction: guest present rate with BGM,
 the first battle's stage/UI assets, and character select after returning from
 battle.
+
+### Browser frame-rate profile after the color-target fix (2026-10-13)
+
+Evidence: `scratch/runs/mbaa-fps-claude-20261012/` (`perf.ndjson` from
+`?perf-stream`, a DevTools trace summary, and a `probe` session recorded with
+`window.__waProfileThreadRun` plus per-present timestamps). All on the
+cooperative backend; the user drove the UI.
+
+- A DevTools trace attributed 26% of all main-thread time to `gl.getError`
+  inside `GpuBackend.bindColorResource`: every draw into the game's explicit
+  color target saved and reloaded it. Fixed in `41644a0eb`; menus went from
+  ~34 to ~58 presents/s and guest execution fell to ~30% of wall time.
+- Music decode bursts (every ~2 s) are spread by `audioThreadStepMs: 1.5`
+  (`63e786a08`). Before the color fix the same cap made no visible difference
+  because the page was CPU-bound.
+- `?force-threads` froze entering a training-mode battle. The chunk cache does
+  not thrash: a character-select session made 30 range requests, none repeated.
+
+Remaining costs, with addresses:
+
+- **58.15 presents/s ceiling.** Present intervals on idle menus are
+  17.1-17.3 ms. `QueryPerformanceCounter` is built from millisecond ticks
+  (`$handle_QueryPerformanceCounter`), and the limiter (`0x41fd60` ->
+  `0x41feb0`, period `1/60` at `0x53de08`/`0x53d680`, `Sleep(8)` or
+  `Sleep(2)` while early) cannot see 16.67 ms, only 16 then 17.
+- **Battle music.** Thread entry `0x40faf0` used 250-560 ms per second in
+  battle. A third of it ends in the libVorbis float-to-int16 loop
+  `0x4f4465`-`0x4f44a4` (`fld`, `fmul m64`, `fstp m64`, `fld m64`, `fistp`,
+  clamp, strided 16-bit store); the rest in `0x4f9xxx`, `0x500xxx`,
+  `0x505c90`, `0x512820`.
+- **Battle load.** Thread entry `0x49ee00` spent ~8.3 s of CPU, mostly in the
+  8bpp-to-BGRA palette expansion loops `0x402fe0` (alpha = index != 0) and
+  `0x403060` (alpha from the palette), plus guest memcpy `0x4e6400`.
+- **Character-select cursor.** Thread entry `0x489b80` used up to ~300 ms per
+  second, mostly in relocated `d3dx9_36.dll` code (`0xbbfcxx`, `0xbf8070`)
+  and `0x4031xx`.
+- The asset loader `0x414180` reads in `[esi+0x50]`-byte chunks with
+  `Sleep([esi+0x54])` between them, while `0x413fb0` blocks the main thread
+  on the loader with `WaitForSingleObjectEx(INFINITE)`.
