@@ -504,15 +504,25 @@
   ;; every call), but the clock under it does, and that is what the guest is
   ;; waiting on. Parked before the counter bump and the store, so the re-run
   ;; on wake is the whole call again.
+  ;;
+  ;; Fine mode ($qpc_fine) reads the clock in microseconds and, inside the
+  ;; learned window before a limiter's next trigger, answers instead of
+  ;; parking. See $qpc_fine in 01-header.wat.
   (func $handle_QueryPerformanceCounter (param $arg0 i32) (param $arg1 i32) (param $arg2 i32) (param $arg3 i32) (param $arg4 i32) (param $name_ptr i32)
-    (local $wa i32) (local $val i64)
+    (local $wa i32) (local $val i64) (local $us i64) (local $window i32)
     (global.set $tick_count (call $host_get_ticks))
+    (local.set $us (i64.mul (i64.extend_i32_u (global.get $tick_count)) (i64.const 1000)))
+    (if (global.get $qpc_fine)
+      (then
+        (local.set $us (i64.trunc_sat_f64_u (call $host_get_time_us)))
+        (local.set $window (call $qpc_fine_track (local.get $us)))))
     (if (call $clock_spin_step (global.get $tick_count))
       (then
-        (if (call $clock_spin_arm (global.get $tick_count)) (then (return)))))
+        (if (i32.eqz (local.get $window))
+          (then
+            (if (call $clock_spin_arm (global.get $tick_count)) (then (return)))))))
     (local.set $wa (call $g2w (local.get $arg0)))
-    (local.set $val (call $qpc_next
-      (i64.mul (i64.extend_i32_u (global.get $tick_count)) (i64.const 1000))))
+    (local.set $val (call $qpc_next (local.get $us)))
     (call $clock_spin_note_raw (i32.wrap_i64 (local.get $val))
       (i32.wrap_i64 (i64.shr_u (local.get $val) (i64.const 32))))
     ;; LARGE_INTEGER is one 64-bit count: neither multiplication nor the
@@ -521,6 +531,41 @@
     (i32.store offset=0 (global.get $reg_base) (i32.const 1))
     (i32.store offset=16 (global.get $reg_base) (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 8)))  ;; stdcall, 1 arg
   )
+
+  ;; Fine-QPC bookkeeping for one read at $us. Returns 1 when the read falls in
+  ;; the last 1 ms before the qualified limiter site's expected trigger, where
+  ;; a park would wake only after it. A wait is the run of reads at that site
+  ;; with no real API work between them ($spin_nonpoll_seq unchanged); its last
+  ;; read is the trigger, and the period is trigger to trigger. Anything other
+  ;; than the qualified site, or an implausible period, leaves parking as is.
+  (func $qpc_fine_track (param $us i64) (result i32)
+    (local $p i64)
+    (if (i32.or (i32.eqz (global.get $clock_spin_qualified_valid))
+          (i32.or (i32.ne (call $spin_call_site) (global.get $clock_spin_qualified_ret))
+                  (i32.ne (i32.load offset=16 (global.get $reg_base))
+                          (global.get $clock_spin_qualified_esp))))
+      (then (return (i32.const 0))))
+    (if (i32.ne (global.get $spin_nonpoll_seq) (global.get $qpc_fine_seq))
+      (then
+        (global.set $qpc_fine_seq (global.get $spin_nonpoll_seq))
+        (if (i64.ne (global.get $qpc_fine_frame) (i64.const 0))
+          (then
+            (local.set $p (i64.sub (global.get $qpc_fine_last) (global.get $qpc_fine_frame)))
+            (global.set $qpc_fine_period
+              (select (local.get $p) (i64.const 0)
+                (i32.and (i64.ge_u (local.get $p) (i64.const 2000))
+                         (i64.le_u (local.get $p) (i64.const 250000)))))))
+        (global.set $qpc_fine_frame (global.get $qpc_fine_last))))
+    (global.set $qpc_fine_last (local.get $us))
+    (if (i32.and (i64.ne (global.get $qpc_fine_period) (i64.const 0))
+                 (i64.ne (global.get $qpc_fine_frame) (i64.const 0)))
+      (then
+        (if (i64.ge_u (i64.add (local.get $us) (i64.const 1000))
+                      (i64.add (global.get $qpc_fine_frame) (global.get $qpc_fine_period)))
+          (then
+            (global.set $qpc_fine_unparked (i32.add (global.get $qpc_fine_unparked) (i32.const 1)))
+            (return (i32.const 1))))))
+    (i32.const 0))
 
   ;; The next process-wide QPC count for a clock reading of $now µs: $now if
   ;; that is past every count handed out so far, else one past the last.

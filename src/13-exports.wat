@@ -1978,6 +1978,12 @@
   ;; The guest millisecond a clock park is due at. The CLI compares it against
   ;; the batch clock; the browser turns it into a setTimeout.
   (func (export "get_spin_deadline_ms") (result i32) (global.get $spin_deadline_ms))
+  ;; Fine QueryPerformanceCounter (see $qpc_fine). Per instance, so the host
+  ;; also records it as an inherited global for guest threads.
+  (func (export "set_qpc_fine") (param $on i32)
+    (global.set $qpc_fine (i32.ne (local.get $on) (i32.const 0))))
+  (func (export "get_qpc_fine_period_us") (result i32) (i32.wrap_i64 (global.get $qpc_fine_period)))
+  (func (export "get_qpc_fine_unparked") (result i32) (global.get $qpc_fine_unparked))
   ;; The last millisecond a clock API handed the guest. Paired with the
   ;; deadline above so a host can turn "due at T" into "sleep for N" without
   ;; having to agree with the guest about what time it is.
@@ -1990,6 +1996,11 @@
   (func (export "get_peek_spin_count") (result i32) (global.get $peek_spin_count))
   (func (export "get_spin_nonpoll_seq") (result i32) (global.get $spin_nonpoll_seq))
   (func (export "test_spin_reset")
+    (global.set $qpc_fine_seq (i32.const 0))
+    (global.set $qpc_fine_last (i64.const 0))
+    (global.set $qpc_fine_frame (i64.const 0))
+    (global.set $qpc_fine_period (i64.const 0))
+    (global.set $qpc_fine_unparked (i32.const 0))
     (global.set $spin_dispatch_seq (i32.const 0))
     (global.set $spin_nonpoll_seq (i32.const 0))
     (global.set $spin_deadline_ms (i32.const 0))

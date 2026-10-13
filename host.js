@@ -1141,6 +1141,9 @@ class WineAssembly {
     // off. `audioThreadStepMs` in lib/apps.js, ?audio-step-ms=N for one load
     // (0 disables). See ThreadManager.audioThreadStepMs.
     this.audioThreadStepMs = 0;
+    // Fine QueryPerformanceCounter (see $qpc_fine): `fineQpc: true` in
+    // lib/apps.js, ?fine-qpc[=0] for one load.
+    this.fineQpc = false;
     // Decode-time x87 fusion is on by default. An app opts out with
     // `x87Fusion: false` in lib/apps.js (browser-shell copies it here), and the
     // page opts out with ?no-x87-fold or the debug toolbar box.
@@ -2209,6 +2212,11 @@ class WineAssembly {
       }
     };
     h.get_ticks = () => self._guestTickMs(sharedAudio);
+    // Continuous guest time for fine QPC. Frozen mode keeps the stepped clock:
+    // nothing may move while the agent holds the step.
+    h.get_time_us = () => (self._frozen
+      ? self._guestTickMs(sharedAudio) * 1000
+      : self._guestContinuousMs(sharedAudio) * 1000);
     // The renderer stamps queued DirectInput edges with this same clock, so a
     // pause -- which stops _guestTickMs but not Date.now() -- cannot make an
     // edge queued before it look like it happened minutes ago.
@@ -2982,6 +2990,11 @@ class WineAssembly {
     if (this.nullPageFaults && this.instance.exports.set_fault_unmapped) {
       this.instance.exports.set_fault_unmapped(4);
     }
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.has('fine-qpc')) this.fineQpc = q.get('fine-qpc') !== '0';
+    } catch (_) {}
+    if (this.instance.exports.set_qpc_fine) this.instance.exports.set_qpc_fine(this.fineQpc ? 1 : 0);
     // The micro-op tier (07d/07e). Not decode-time: a hot head is compiled on
     // its 256th entry whenever the tier is on, and turning it off flushes every
     // program, so setUop() below can flip it on a running app too.
@@ -3056,6 +3069,9 @@ class WineAssembly {
       }
       if (this.instance.exports.set_x87_affine_fusion) {
         await this.guestWorker.callExport('set_x87_affine_fusion', x87Fusion);
+      }
+      if (this.instance.exports.set_qpc_fine) {
+        await this.guestWorker.callExport('set_qpc_fine', this.fineQpc ? 1 : 0);
       }
       if (this.nullPageFaults && this.instance.exports.set_fault_unmapped) {
         await this.guestWorker.callExport('set_fault_unmapped', 4);
@@ -3216,6 +3232,7 @@ class WineAssembly {
         x87FuseDebug[0] | 0, x87FuseDebug[1] | 0, x87FuseDebug[2] | 0);
     }
     this.threadManager.recordInheritedWasmGlobal('set_cpu_sse', cpuSSE);
+    this.threadManager.recordInheritedWasmGlobal('set_qpc_fine', this.fineQpc ? 1 : 0);
     this.threadManager.recordInheritedWasmGlobal('set_present_cap', presentCap);
     this.threadManager.recordInheritedWasmGlobal('set_present_pace_mode',
       this.presentPace === 'deadline' ? 0 : 1);

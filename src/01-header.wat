@@ -33,6 +33,9 @@
   (import "host" "shell_extract_icon_resource" (func $host_shell_extract_icon_resource
     (param i32 i32 i32 i32 i32 i32) (result i32)))
   (import "host" "get_ticks" (func $host_get_ticks (result i32)))
+  ;; The same guest clock in microseconds, with its sub-millisecond part.
+  ;; Read only by the opt-in fine QueryPerformanceCounter ($qpc_fine).
+  (import "host" "get_time_us" (func $host_get_time_us (result f64)))
   ;; Wall clock, as against the guest clock above, which a harness may
   ;; synthesise — test/run.js derives get_ticks from the batch counter. Use
   ;; this only to bound a wait on something outside this instance.
@@ -3306,6 +3309,20 @@
   (global $spin_dispatch_seq (mut i32) (i32.const 0))  ;; bumped once per $win32_dispatch
   (global $spin_park_k (mut i32) (i32.const 8))        ;; 0 disables both detectors
   (global $spin_deadline_ms (mut i32) (i32.const 0))   ;; guest ms a clock park is due at
+  ;; Fine QPC (opt-in, `fineQpc` in lib/apps.js). A QPC limiter that restarts
+  ;; its frame clock from the reading that ended the wait cannot reach its
+  ;; period when the clock moves in whole milliseconds and the park wakes on
+  ;; the next one: MBAACC's 1/60 s limiter saw 16 (early) then 17, every
+  ;; frame. In fine mode QPC returns microseconds, and the qualified spin site
+  ;; learns its own trigger-to-trigger period: within $QPC_FINE_MARGIN_US of
+  ;; the next expected trigger it is answered instead of parked, so the guest
+  ;; polls the real clock through the last stretch, as it would on Windows.
+  (global $qpc_fine (mut i32) (i32.const 0))
+  (global $qpc_fine_seq (mut i32) (i32.const 0))       ;; $spin_nonpoll_seq at the last site read
+  (global $qpc_fine_last (mut i64) (i64.const 0))      ;; µs of the last site read
+  (global $qpc_fine_frame (mut i64) (i64.const 0))     ;; µs the previous wait ended
+  (global $qpc_fine_period (mut i64) (i64.const 0))    ;; learned µs between wait ends
+  (global $qpc_fine_unparked (mut i32) (i32.const 0))  ;; reads answered inside the window
   (global $clock_spin_count (mut i32) (i32.const 0))
   (global $clock_spin_value (mut i32) (i32.const 0))
   (global $clock_spin_seq (mut i32) (i32.const 0))
