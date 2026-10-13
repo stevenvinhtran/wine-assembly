@@ -1144,6 +1144,10 @@ class WineAssembly {
     // Fine QueryPerformanceCounter (see $qpc_fine): `fineQpc: true` in
     // lib/apps.js, ?fine-qpc[=0] for one load.
     this.fineQpc = false;
+    // Native answer for a game's Ogg Vorbis fill routine (lib/native-vorbis-fill.js):
+    // `nativeVorbisFill: {eip, ...}` in lib/apps.js, ?native-vorbis=0 to disable.
+    this.nativeVorbisFill = null;
+    this._nativeVorbis = null;
     // Decode-time x87 fusion is on by default. An app opts out with
     // `x87Fusion: false` in lib/apps.js (browser-shell copies it here), and the
     // page opts out with ?no-x87-fold or the debug toolbar box.
@@ -1789,6 +1793,8 @@ class WineAssembly {
       // browser context on the same path so short-lived Storm events release
       // their fixed-table slots instead of leaking until creation fails.
       closeSyncHandle: handle => self._closeSyncHandle(handle),
+      // $native_hook_eip: answered against the calling thread's own exports.
+      nativeHook: (eip, ex) => !!(self._nativeVorbis && self._nativeVorbis.hook(eip, ex)),
       signalSyncHandle: handle => self.threadManager
         ? self.threadManager.setEvent(handle >>> 0) : 0,
       resetSyncHandle: handle => self.threadManager
@@ -2995,6 +3001,19 @@ class WineAssembly {
       if (q.has('fine-qpc')) this.fineQpc = q.get('fine-qpc') !== '0';
     } catch (_) {}
     if (this.instance.exports.set_qpc_fine) this.instance.exports.set_qpc_fine(this.fineQpc ? 1 : 0);
+    try {
+      if (new URLSearchParams(location.search).get('native-vorbis') === '0') this.nativeVorbisFill = null;
+    } catch (_) {}
+    // Cooperative only: the hook reads and writes the calling thread's
+    // registers through its exports, which a Worker-backed thread keeps.
+    if (this.nativeVorbisFill && !this.guestWorker && this.instance.exports.set_native_hook_eip &&
+        typeof NativeVorbisFill === 'function') {
+      this._nativeVorbis = new NativeVorbisFill(this.nativeVorbisFill, {
+        getBuffer: () => this.memory.buffer,
+        log: msg => this.logToUI(msg),
+      });
+      this.instance.exports.set_native_hook_eip(this.nativeVorbisFill.eip >>> 0);
+    }
     // The micro-op tier (07d/07e). Not decode-time: a hot head is compiled on
     // its 256th entry whenever the tier is on, and turning it off flushes every
     // program, so setUop() below can flip it on a running app too.
@@ -3233,6 +3252,9 @@ class WineAssembly {
     }
     this.threadManager.recordInheritedWasmGlobal('set_cpu_sse', cpuSSE);
     this.threadManager.recordInheritedWasmGlobal('set_qpc_fine', this.fineQpc ? 1 : 0);
+    if (this._nativeVorbis) {
+      this.threadManager.recordInheritedWasmGlobal('set_native_hook_eip', this.nativeVorbisFill.eip >>> 0);
+    }
     this.threadManager.recordInheritedWasmGlobal('set_present_cap', presentCap);
     this.threadManager.recordInheritedWasmGlobal('set_present_pace_mode',
       this.presentPace === 'deadline' ? 0 : 1);

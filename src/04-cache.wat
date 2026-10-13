@@ -2173,8 +2173,9 @@
     ;; No test on $steps here. Running out is now a resume, not a restart:
     ;; $next parks $ip in $resume_ip and $run picks the block up where it left
     ;; off, without spending a second block from the budget for it.
-    (if (i32.or (i32.eq (global.get $eip) (global.get $sbh_eip_a))
-                (i32.eq (global.get $eip) (global.get $sbh_eip_b)))
+    (if (i32.or (i32.or (i32.eq (global.get $eip) (global.get $sbh_eip_a))
+                        (i32.eq (global.get $eip) (global.get $sbh_eip_b)))
+                (i32.eq (global.get $eip) (global.get $native_hook_eip)))
       (then (call $uop_fast_bump) (return)))
     (local.set $t (call $page_resolve (global.get $eip)))
     (if (i32.eqz (local.get $t)) (then (call $uop_fast_bump) (return)))

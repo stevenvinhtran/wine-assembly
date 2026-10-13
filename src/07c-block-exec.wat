@@ -5729,6 +5729,19 @@
               (then
                 (local.set $side (i32.const 1))
                 (br $done)))))
+        ;; The same side exit for a host-answered entry ($native_hook_eip),
+        ;; so $run sees it however the region reached it.
+        (if (global.get $native_hook_eip)
+          (then
+            (local.set $exit_eip
+              (i32.load offset=48
+                (i32.add (local.get $BR)
+                  (i32.mul (local.get $next_b)
+                    (i32.shl (global.get $REGION_BLOCK_WORDS) (i32.const 2))))))
+            (if (i32.eq (local.get $exit_eip) (global.get $native_hook_eip))
+              (then
+                (local.set $side (i32.const 1))
+                (br $done)))))
         ;; Safepoint. The only place either meter is allowed to stop the run is
         ;; a block edge, because that is the only place the guest is in a state
         ;; the rest of the emulator can read: every register is a value in a

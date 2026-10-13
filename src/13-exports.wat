@@ -311,6 +311,13 @@
         (then
           (if (call $fast_msvc_sbh_scan)
             (then (br $main)))))
+      ;; A host-answered function entry ($native_hook_eip). On 1 the host has
+      ;; already returned to the caller; on 0 the guest code runs below.
+      (if (i32.and (i32.ne (global.get $native_hook_eip) (i32.const 0))
+                   (i32.eq (global.get $eip) (global.get $native_hook_eip)))
+        (then
+          (if (call $host_native_hook (global.get $eip))
+            (then (br $main)))))
       ;; The page index is the only lookup there is now: it is exact, so a miss
       ;; here really does mean nothing is compiled at this address. The hash
       ;; cache that used to sit between these two rungs is gone --
@@ -1980,6 +1987,12 @@
   (func (export "get_spin_deadline_ms") (result i32) (global.get $spin_deadline_ms))
   ;; Fine QueryPerformanceCounter (see $qpc_fine). Per instance, so the host
   ;; also records it as an inherited global for guest threads.
+  ;; Arm (or with 0 disarm) the host-answered function entry. Bumping the
+  ;; chain epoch kills every chain patched before, as $sbh_note_candidate does.
+  (func (export "set_native_hook_eip") (param $eip i32)
+    (global.set $native_hook_eip (local.get $eip))
+    (call $chain_bump))
+  (func (export "get_native_hook_eip") (result i32) (global.get $native_hook_eip))
   (func (export "set_qpc_fine") (param $on i32)
     (global.set $qpc_fine (i32.ne (local.get $on) (i32.const 0))))
   (func (export "get_qpc_fine_period_us") (result i32) (i32.wrap_i64 (global.get $qpc_fine_period)))

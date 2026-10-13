@@ -1,6 +1,6 @@
 {
   "generated_from": "src/main.watx include closure",
-  "count": 268,
+  "count": 269,
   "sigs": {
     "log": {
       "params": [
@@ -116,6 +116,14 @@
       "params": [],
       "results": [
         "f64"
+      ]
+    },
+    "native_hook": {
+      "params": [
+        "i32"
+      ],
+      "results": [
+        "i32"
       ]
     },
     "real_time_ms": {

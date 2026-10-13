@@ -36,6 +36,10 @@
   ;; The same guest clock in microseconds, with its sub-millisecond part.
   ;; Read only by the opt-in fine QueryPerformanceCounter ($qpc_fine).
   (import "host" "get_time_us" (func $host_get_time_us (result f64)))
+  ;; native_hook(eip) -> 1 when the host replaced the guest function entered at
+  ;; $native_hook_eip (it has already set EIP/ESP/EAX to the return), 0 to run
+  ;; the guest code as usual. See $native_hook_eip.
+  (import "host" "native_hook" (func $host_native_hook (param i32) (result i32)))
   ;; Wall clock, as against the guest clock above, which a harness may
   ;; synthesise — test/run.js derives get_ticks from the batch counter. Use
   ;; this only to bound a wait on something outside this instance.
@@ -2669,6 +2673,12 @@
   ;; blocks, so a worker just re-recognizes the same address for itself.
   (global $sbh_eip_a (mut i32) (i32.const 0))
   (global $sbh_eip_b (mut i32) (i32.const 0))
+  ;; A guest function entry the host may answer natively (per-app, opt-in,
+  ;; e.g. MBAACC's Vorbis fill routine). Checked where the $sbh_eip pair is:
+  ;; $run asks $host_native_hook at this entry, and block transfers to it
+  ;; return to $run instead of chaining. Setting it bumps the chain epoch.
+  ;; Per instance; the host records it as an inherited global for threads.
+  (global $native_hook_eip (mut i32) (i32.const 0))
   (global $handler_hist_last (mut i32) (i32.const -1))
   (global $branch_hist_kind (mut i32) (i32.const 0))
   (global $branch_hist_operand (mut i32) (i32.const 0))
