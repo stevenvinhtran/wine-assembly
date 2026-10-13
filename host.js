@@ -3653,6 +3653,13 @@ class WineAssembly {
     const processName = guestPath
       ? guestPath.slice(3).replace(/\//g, '\\') : exeName;
     this._exeName = exeName;
+    // Persistent, MBAACC-only audio-output A/B test. Keep guest decoding,
+    // cursors and notifications running; only looping output is suppressed.
+    if (exeName.toLowerCase() === 'mbaa.exe' && this._sharedAudio && typeof localStorage !== 'undefined') {
+      try {
+        this._sharedAudio.suppressLoopingOutput = localStorage.getItem('mbaa.disableMusicOutput') === '1';
+      } catch (_) { /* Storage may be unavailable in private browsing. */ }
+    }
     this._exeUrl = url;
     if (opts.args) this._extraArgs = opts.args;
 

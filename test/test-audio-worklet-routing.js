@@ -117,6 +117,25 @@ async function settleModule(ctx) {
 (async () => {
   console.log('AudioWorklet routing rules');
 
+  // The persistent MBAACC A/B setting disables output, not guest timing.
+  {
+    const { ctx, host, sharedAudio } = makeCtx();
+    sharedAudio.suppressLoopingOutput = true;
+    const id = host.voice_open(RATE, 1, 8);
+    const sources = counters.bufferSources, nodes = counters.workletNodes;
+    host.voice_play_ring(id, PTR, RING, 0, 1);
+    ctx._voices._ac.currentTime += 0.025;
+    ok(host.voice_get_pos(id) > 0, 'suppressed music retains an advancing cursor');
+    host.voice_play_ring(id, PTR, RING, 0, 2);
+    ok(counters.bufferSources === sources && counters.workletNodes === nodes,
+      'suppressed looping Play and Unlock create no audio output nodes');
+    ok(host.voice_is_playing(id), 'suppressed loop retains guest playback state');
+    host.voice_stop(id);
+    ok(!host.voice_is_playing(id), 'Stop still ends suppressed playback');
+    host.voice_play_ring(id, PTR, RING, 0, 0);
+    ok(counters.bufferSources === sources + 1, 'one-shot effects remain audible');
+  }
+
   // ===== ON BY DEFAULT, and the way back ===================================
   // The splice path is not merely a slower alternative -- an AudioBufferSource
   // cannot be rewound or mutated, so it can only FAKE a ring rewrite, and the

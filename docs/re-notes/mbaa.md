@@ -105,6 +105,15 @@ measured, and music decoding itself still consumes interpreter CPU.
 
 ### Cooperative AudioWorklet promotion (2026-10-12)
 
+For the user's requested music-off comparison, browser localStorage key
+`mbaa.disableMusicOutput=1` now suppresses looping DirectSound output at MBAACC
+launch. Unlike the earlier temporary page monkey-patch, it survives reloads.
+It preserves simulated playback/cursor state and notifications, and permits
+one-shot effects. This isolates host looping output, not guest music decoding;
+it must not be described as disabling all music CPU work. Remove the key and
+relaunch to restore normal output. The routing suite covers silent looping
+Play/Unlock, advancing cursor, Stop and an audible one-shot (44 checks pass).
+
 The user reports that the wake-budget change did not resolve music lag.
 An additional host-side defect was reproduced in `test-audio-worklet-routing.js`:
 the first looping Play starts the lazy worklet module load and falls back to
