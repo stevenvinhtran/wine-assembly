@@ -1967,7 +1967,10 @@
     (if (i32.eqz (local.get $mip)) (then (return)))
     (if (i32.and (call $gl32 (i32.add (local.get $texture) (i32.const 40))) (i32.const 1)) (then (return)))
     (if (i32.load offset=20 (local.get $mip)) (then (return)))
-    (if (i32.and (local.get $flags) (i32.const -43025)) (then (return))) ;; READONLY|NOSYSLOCK|DISCARD|NO_DIRTY_UPDATE
+    ;; READONLY|NOSYSLOCK|DISCARD|DONOTWAIT|NO_DIRTY_UPDATE are the LockRect
+    ;; flags D3D9 defines for textures. DONOTWAIT (0x4000) only matters for a
+    ;; GPU-busy surface; these levels are CPU storage, so it locks normally.
+    (if (i32.and (local.get $flags) (i32.const -59409)) (then (return)))
     (local.set $right (i32.load (local.get $mip))) (local.set $bottom (i32.load offset=4 (local.get $mip)))
     (if (local.get $rect) (then
       (local.set $left (call $gl32 (local.get $rect)))

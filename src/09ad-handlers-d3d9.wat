@@ -818,6 +818,15 @@
       (then (if (i32.eqz (call $d3d9_texture_format_supported
               (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 28)))))
         (then (i32.store offset=0 (global.get $reg_base) (i32.const 0x8876086A)))))) ;; D3DERR_NOTAVAILABLE
+    ;; $d3d9_hide_dxt (per app): answer DXT texture formats "not available" so
+    ;; D3DX picks an uncompressed format instead of compressing at load time,
+    ;; which interpreted is most of MBAACC's battle load. CreateTexture with a
+    ;; DXT format still succeeds for a caller that asks without checking.
+    (if (i32.and (global.get $d3d9_hide_dxt)
+          (i32.and (i32.eq (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24))) (i32.const 3))
+            (i32.ne (call $d3d9_texture_block_bytes
+              (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 28)))) (i32.const 0))))
+      (then (i32.store offset=0 (global.get $reg_base) (i32.const 0x8876086A))))
     (if (i32.and (i32.eq (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 28))) (i32.const 23))
       (i32.or (i32.ne (i32.and (local.get $arg4) (i32.const 1)) (i32.const 0))
         (i32.eq (call $gl32 (i32.add (i32.load offset=16 (global.get $reg_base)) (i32.const 24))) (i32.const 1))))
@@ -910,7 +919,12 @@
       (i32.store offset=40 (local.get $wa) (i32.const 255)) ;; depth comparisons
       (i32.store offset=44 (local.get $wa) (i32.const 0x7ff)) ;; source blend factors
       (i32.store offset=48 (local.get $wa) (i32.const 0x3ff)) ;; destination blend factors
-      (i32.store offset=60 (local.get $wa) (i32.const 0x4147)) ;; sampled 2D mip textures, conditional NPOT
+      ;; sampled 2D mip textures, conditional NPOT -- or, with $d3d9_full_npot
+      ;; (per app), unconditional NPOT as current GPUs and Wine report. Under
+      ;; POW2 D3DX pads every non-power-of-two image it loads: decode,
+      ;; resample, and for DXT re-compress -- most of MBAACC's battle load.
+      (i32.store offset=60 (local.get $wa)
+        (select (i32.const 0x4045) (i32.const 0x4147) (global.get $d3d9_full_npot)))
       (i32.store offset=64 (local.get $wa) (i32.const 0x03030300)) ;; point/linear min,mag,mip
       (i32.store offset=76 (local.get $wa) (i32.const 0x17)) ;; wrap/mirror/clamp, independent UV
       (i32.store offset=100 (local.get $wa) (i32.const 2048))

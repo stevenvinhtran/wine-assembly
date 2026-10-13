@@ -224,3 +224,24 @@ Remaining costs, with addresses:
 - The asset loader `0x414180` reads in `[esi+0x50]`-byte chunks with
   `Sleep([esi+0x54])` between them, while `0x413fb0` blocks the main thread
   on the loader with `WaitForSingleObjectEx(INFINITE)`.
+
+### Heap leak: one retained WASM instance per guest thread (2026-10-13)
+
+A DevTools heap snapshot after character select -> battle -> character select
+held 1,513 live `WasmTrustedInstanceData` (about 3.2M exported-function
+wrappers, roughly 450 MB of V8 heap). The 120 major GCs in the matching trace
+took about 200 ms each, which was half of all main-thread time, and the page
+later crashed. Retainer path: `WineRecorder._pumps` (Set) -> `_pumpAudioTap`
+-> host-audio closure -> the thread's host imports -> `workerInstance`. Every
+cooperative thread registered a recorder pump and nothing removed it, and MBAA
+spawns a loader thread per asset. The pumps are now keyed by the shared voices
+table (`host.js` `registerPump(fn, key)`), and
+`test-audio-tap-pump-leak.js` guards it. The 2.1 GB ArrayBuffer in the snapshot
+is guest memory; the other ArrayBuffers are about 0.45 GB, mostly D3D9
+texture snapshots.
+
+Character select after the fix is still one core: the scroll loader thread runs
+5-12M blocks/s while the main thread is parked 50-75% of the time (perf-stream
+`counters`). Real parallelism needs the Worker backend, whose
+`GuestThreadHost.spawnThread` boots a fresh Worker per thread and never reuses
+slots, the probable cause of the `?force-threads` freeze entering battle.

@@ -254,7 +254,13 @@ const frozenRecorder = {
   _lastStep: -1,
   _postChain: Promise.resolve(),
   _capture: null,
-  _pumps: new Set(),
+  // voices table -> pump. Every guest thread builds its own host
+  // imports, and each used to add a pump here forever: the pump's closure
+  // holds that thread's whole WASM instance, so MBAACC's ~1 loader thread per
+  // asset kept 1,500 dead instances (and their ~2k function wrappers each)
+  // alive, which turned into 200ms major GCs and an out-of-memory crash.
+  // Threads share one voices table, so one live pump per table is enough.
+  _pumps: new Map(),
   // A queue this deep already means the sink cannot keep up; holding more
   // just converts a network problem into a memory problem.
   MAX_QUEUED_FRAMES: 240,
@@ -331,12 +337,15 @@ const frozenRecorder = {
     return summary;
   },
 
-  registerPump(fn) {
-    if (typeof fn === 'function') frozenRecorder._pumps.add(fn);
+  registerPump(fn, key) {
+    if (typeof fn !== 'function') return;
+    // The newest pump for a table replaces the last, so at most one thread
+    // instance per table stays reachable from here.
+    frozenRecorder._pumps.set(key || fn, fn);
   },
 
   pumpAudio() {
-    for (const fn of frozenRecorder._pumps) { try { fn(); } catch (_) {} }
+    for (const fn of frozenRecorder._pumps.values()) { try { fn(); } catch (_) {} }
   },
 
   // Called from _frozenPump with the state the step just produced.
@@ -1144,11 +1153,20 @@ class WineAssembly {
     // Fine QueryPerformanceCounter (see $qpc_fine): `fineQpc: true` in
     // lib/apps.js, ?fine-qpc[=0] for one load.
     this.fineQpc = false;
+    // `d3d9FullNpot: true` in lib/apps.js: D3D9 caps report unconditional
+    // non-power-of-two textures. ?full-npot=0 for one load.
+    this.d3d9FullNpot = false;
+    // `d3d9HideDxt: true`: CheckDeviceFormat reports DXT textures unavailable,
+    // so D3DX loads them uncompressed. ?hide-dxt=0 for one load.
+    this.d3d9HideDxt = false;
     // Guest function entries answered natively ($native_hook0..3):
     // `nativeHooks: [{kind, va, module?, ...}]` in lib/apps.js. Kinds:
-    // 'vorbis-fill' (lib/native-vorbis-fill.js) and 'd3dx-encode-a8r8g8b8'
-    // (lib/native-d3dx-encode.js). ?native-hooks=0 disables all of them,
-    // ?native-vorbis=0 / ?native-d3dx=0 one kind. Armed after DLL load.
+    // 'vorbis-fill' (lib/native-vorbis-fill.js), 'd3dx-encode-a8r8g8b8'
+    // (lib/native-d3dx-encode.js), 'mbaa-palette' (lib/native-mbaa-palette.js)
+    // 'png-unfilter' (lib/native-png-unfilter.js) and 'd3dx-dxt5-memo'
+    // (lib/native-block-memo.js). ?native-hooks=0 disables all of them,
+    // ?native-vorbis=0 / ?native-d3dx=0 / ?native-palette=0 / ?native-png=0 /
+    // ?native-dxt5=0 one kind. Armed after DLL load.
     this.nativeHooks = null;
     this._nativeHookByEip = new Map();
     this._nativeHookHandlers = [];
@@ -1852,7 +1870,7 @@ class WineAssembly {
       // is how a looping DirectSound ring nobody touched still gets its swept
       // window emitted once per captured frame.
       audioTap: () => (frozenRecorder.active ? frozenRecorder : null),
-      registerAudioTapPump: fn => frozenRecorder.registerPump(fn),
+      registerAudioTapPump: (fn, key) => frozenRecorder.registerPump(fn, key),
       onOpenGLContextCountChange: count => {
         if (typeof self.onOpenGLContextCountChange === 'function') {
           self.onOpenGLContextCountChange(count | 0);
@@ -3008,6 +3026,13 @@ class WineAssembly {
       if (q.has('fine-qpc')) this.fineQpc = q.get('fine-qpc') !== '0';
     } catch (_) {}
     if (this.instance.exports.set_qpc_fine) this.instance.exports.set_qpc_fine(this.fineQpc ? 1 : 0);
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.has('full-npot')) this.d3d9FullNpot = q.get('full-npot') !== '0';
+      if (q.has('hide-dxt')) this.d3d9HideDxt = q.get('hide-dxt') !== '0';
+    } catch (_) {}
+    if (this.instance.exports.set_d3d9_full_npot) this.instance.exports.set_d3d9_full_npot(this.d3d9FullNpot ? 1 : 0);
+    if (this.instance.exports.set_d3d9_hide_dxt) this.instance.exports.set_d3d9_hide_dxt(this.d3d9HideDxt ? 1 : 0);
     // The micro-op tier (07d/07e). Not decode-time: a hot head is compiled on
     // its 256th entry whenever the tier is on, and turning it off flushes every
     // program, so setUop() below can flip it on a running app too.
@@ -3085,6 +3110,12 @@ class WineAssembly {
       }
       if (this.instance.exports.set_qpc_fine) {
         await this.guestWorker.callExport('set_qpc_fine', this.fineQpc ? 1 : 0);
+      }
+      if (this.instance.exports.set_d3d9_full_npot) {
+        await this.guestWorker.callExport('set_d3d9_full_npot', this.d3d9FullNpot ? 1 : 0);
+      }
+      if (this.instance.exports.set_d3d9_hide_dxt) {
+        await this.guestWorker.callExport('set_d3d9_hide_dxt', this.d3d9HideDxt ? 1 : 0);
       }
       if (this.nullPageFaults && this.instance.exports.set_fault_unmapped) {
         await this.guestWorker.callExport('set_fault_unmapped', 4);
@@ -3246,6 +3277,8 @@ class WineAssembly {
     }
     this.threadManager.recordInheritedWasmGlobal('set_cpu_sse', cpuSSE);
     this.threadManager.recordInheritedWasmGlobal('set_qpc_fine', this.fineQpc ? 1 : 0);
+    this.threadManager.recordInheritedWasmGlobal('set_d3d9_full_npot', this.d3d9FullNpot ? 1 : 0);
+    this.threadManager.recordInheritedWasmGlobal('set_d3d9_hide_dxt', this.d3d9HideDxt ? 1 : 0);
     this.threadManager.recordInheritedWasmGlobal('set_present_cap', presentCap);
     this.threadManager.recordInheritedWasmGlobal('set_present_pace_mode',
       this.presentPace === 'deadline' ? 0 : 1);
@@ -4575,16 +4608,32 @@ class WineAssembly {
     let q = null;
     try { q = new URLSearchParams(location.search); } catch (_) {}
     if (q && q.get('native-hooks') === '0') return;
-    const off = { 'vorbis-fill': 'native-vorbis', 'd3dx-encode-a8r8g8b8': 'native-d3dx' };
+    const off = { 'vorbis-fill': 'native-vorbis', 'd3dx-encode-a8r8g8b8': 'native-d3dx',
+      'mbaa-palette': 'native-palette', 'png-unfilter': 'native-png', 'd3dx-dxt5-memo': 'native-dxt5',
+      'd3dx-dxt5-encode': 'native-dxt5', 'd3dx-dxt-color-decode': 'native-dxt-decode',
+      'd3dx-dxt3-decode': 'native-dxt-decode', 'd3dx-dxt5-decode': 'native-dxt-decode',
+      'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
       'd3dx-encode-a8r8g8b8': cfg => typeof NativeD3DXEncode === 'function' && new NativeD3DXEncode(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'mbaa-palette': cfg => typeof NativeMbaaPalette === 'function' && new NativeMbaaPalette(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'png-unfilter': cfg => typeof NativePngUnfilter === 'function' && new NativePngUnfilter(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'd3dx-dxt5-memo': cfg => typeof NativeBlockMemo === 'function' && new NativeBlockMemo(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'd3dx-dxt5-encode': cfg => typeof NativeDxt5Encode === 'function' && new NativeDxt5Encode(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'd3dx-argb-decode': cfg => typeof NativeArgbDecode === 'function' && new NativeArgbDecode(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'zlib-inflate': cfg => typeof NativeInflate === 'function' && new NativeInflate(cfg, {
+        getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
     };
     let slot = 0;
     for (const cfg of this.nativeHooks) {
-      if (slot > 3 || !cfg || !make[cfg.kind]) continue;
+      if (slot > 15 || !cfg || !(make[cfg.kind] || /^d3dx-dxt(-color|3|5)-decode$/.test(cfg.kind))) continue;
       if (q && q.get(off[cfg.kind]) === '0') continue;
       let eip = cfg.va >>> 0;
       if (cfg.module) {
@@ -4592,15 +4641,54 @@ class WineAssembly {
         if (!m) { this.logToUI(`[native-hook] ${cfg.kind}: ${cfg.module} is not loaded`); continue; }
         eip = (m.loadAddr + (eip - m.origBase)) >>> 0;
       }
-      const handler = make[cfg.kind](Object.assign({}, cfg, { eip }));
+      const dxtDecode = /^d3dx-dxt(-color|3|5)-decode$/.test(cfg.kind);
+      const handler = dxtDecode
+        ? (typeof NativeDxtDecode === 'function' && new NativeDxtDecode(Object.assign({}, cfg, { eip }), {
+          getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }))
+        : make[cfg.kind](Object.assign({}, cfg, { eip }));
       if (!handler) continue;
       ex.set_native_hook(slot, eip);
       if (this.threadManager) this.threadManager.recordInheritedWasmGlobal('set_native_hook', slot, eip);
       this._nativeHookByEip.set(eip, handler);
       this._nativeHookHandlers.push(handler);
+      if (handler.exportNew && handler.importPacked) this._persistNativeMemo(handler, `${cfg.kind}:${cfg.module || ''}:${cfg.va >>> 0}`);
       this.logToUI(`[native-hook] ${cfg.kind} at 0x${eip.toString(16)} (slot ${slot})`);
       slot++;
     }
+  }
+
+  // Keep a memoizing native hook's cache across sessions in IndexedDB: stored
+  // chunks are loaded once at arm time, and new entries are appended every few
+  // seconds. Any storage failure just leaves the cache in memory.
+  _persistNativeMemo(handler, name) {
+    if (typeof indexedDB === 'undefined') return;
+    let db = null;
+    const open = indexedDB.open('wine-assembly-native-memo', 1);
+    open.onupgradeneeded = () => {
+      if (!open.result.objectStoreNames.contains('chunks')) {
+        open.result.createObjectStore('chunks', { autoIncrement: true }).createIndex('name', 'name');
+      }
+    };
+    open.onerror = () => {};
+    open.onsuccess = () => {
+      db = open.result;
+      try {
+        const req = db.transaction('chunks').objectStore('chunks').index('name').getAll(name);
+        req.onsuccess = () => {
+          let n = 0;
+          for (const rec of req.result || []) n += handler.importPacked(rec.data);
+          if (n) this.logToUI(`[native-hook] ${name}: ${n} cached entries loaded`);
+        };
+      } catch (_) {}
+    };
+    const flush = () => {
+      if (!db || !this.running) return;
+      const data = handler.exportNew();
+      if (!data.length) return;
+      try { db.transaction('chunks', 'readwrite').objectStore('chunks').add({ name, data }); } catch (_) {}
+    };
+    this._nativeMemoTimers = this._nativeMemoTimers || [];
+    this._nativeMemoTimers.push(setInterval(flush, 3000));
   }
 
   // Remember where an image landed, and resolve an address back to it.
@@ -4838,6 +4926,7 @@ class WineAssembly {
     if (this._stopChildren) { const stopKids = this._stopChildren; this._stopChildren = null; stopKids(); }
     if (this._manifestAssetAbort) this._manifestAssetAbort.abort();
     if (this._backgroundAssetJobs) this._backgroundAssetJobs.length = 0;
+    if (this._nativeMemoTimers) { this._nativeMemoTimers.forEach(clearInterval); this._nativeMemoTimers = []; }
     // Put the final frame on the canvas before stepping ends, then drop the
     // pending rAF: a scheduled frame holds this host alive, and nothing will
     // present for a stopped host again. A dirty DirectDraw surface counts even
@@ -6743,6 +6832,10 @@ class WineAssembly {
         const ioWaiting = self.instance.exports.get_yield_reason() === 12 && self._pollMainIo();
         const mainThreadWaiting = renderWaiting || ioWaiting || (self.threadManager &&
           (self._isMainExecutionSuspended() || self.threadManager.checkMainYield()));
+        if (perf && perf.count) {
+          perf.count(mainThreadWaiting ? (renderWaiting ? 'park.render' : ioWaiting ? 'park.io'
+            : self._isMainExecutionSuspended() ? 'park.suspended' : 'park.wait') : 'run');
+        }
         if (mainThreadWaiting) {
           mainParked = true;
           // Main still waiting — just run worker threads.
@@ -7011,8 +7104,12 @@ class WineAssembly {
             if (threadBudget > 0) {
               if (windowCount && self.threadManager.runBudgeted) {
                 const quantumSteps = audioHot ? (menuOpen ? 20000 : 10000) : 50000;
+                // A parked main thread has nothing to run this step, so the
+                // 4ms audio-hot cap only idles the page while the thread it
+                // waits on (MBAA's sprite loader in character select) trickles.
+                // Audio threads still go first (prioritizeAudioThreads).
                 const maxWallMs = audioHot
-                  ? (menuOpen ? (mainThreadWaiting ? 8 : 6) : 4)
+                  ? (menuOpen ? (mainThreadWaiting ? 8 : 6) : (mainThreadWaiting ? 10 : 4))
                   // While input is arriving, workers get a short quantum so
                   // the pointer still feels attached to the cursor — but a
                   // short one, not none.
@@ -7021,7 +7118,7 @@ class WineAssembly {
                   // Non-audio UI workers should be limited by the wall-clock
                   // budget, not by one nominal interpreter slice. Credits
                   // needs several quanta before it can present its first frame.
-                  maxTotalSteps: audioHot ? threadBudget : threadBudget * 4,
+                  maxTotalSteps: audioHot && !mainThreadWaiting ? threadBudget : threadBudget * 4,
                   quantumSteps,
                   maxWallMs,
                   prioritizeAudioThreads: audioHot && !menuOpen,
@@ -7041,6 +7138,13 @@ class WineAssembly {
                 // by its own idle loop. That distinction is invisible from
                 // the page's frame rate, which stays a perfect 60 either way.
                 if (perf && threadStats) {
+                  if (perf.count) {
+                    const tag = mainThreadWaiting ? 'parked' : 'live';
+                    perf.count(`workers.${tag}.ms`, performance.now() - perfThreadStart);
+                    perf.count(`workers.${tag}.blocks`, threadStats.blocks || 0);
+                    if (threadStats.hitDeadline) perf.count(`workers.${tag}.deadline`);
+                    perf.count(`workers.${tag}.cap.${maxWallMs}ms`);
+                  }
                   perf.countBlocks(threadStats.blocks || 0);
                   perf.markThrottled(!!threadStats.hitDeadline);
                 }

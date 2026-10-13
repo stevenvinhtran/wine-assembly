@@ -2673,7 +2673,8 @@
   ;; blocks, so a worker just re-recognizes the same address for itself.
   (global $sbh_eip_a (mut i32) (i32.const 0))
   (global $sbh_eip_b (mut i32) (i32.const 0))
-  ;; Guest function entries the host may answer natively (per-app, opt-in:
+  ;; Guest function entries the host may answer natively (per-app, opt-in,
+  ;; sixteen slots;
   ;; MBAACC's Vorbis fill routine, D3DX's A8R8G8B8 row encoder). Checked where
   ;; the $sbh_eip pair is: $run asks $host_native_hook at an entry, and block
   ;; transfers to one return to $run instead of chaining. Setting a slot bumps
@@ -2683,6 +2684,18 @@
   (global $native_hook1 (mut i32) (i32.const 0))
   (global $native_hook2 (mut i32) (i32.const 0))
   (global $native_hook3 (mut i32) (i32.const 0))
+  (global $native_hook4 (mut i32) (i32.const 0))
+  (global $native_hook5 (mut i32) (i32.const 0))
+  (global $native_hook6 (mut i32) (i32.const 0))
+  (global $native_hook7 (mut i32) (i32.const 0))
+  (global $native_hook8 (mut i32) (i32.const 0))
+  (global $native_hook9 (mut i32) (i32.const 0))
+  (global $native_hook10 (mut i32) (i32.const 0))
+  (global $native_hook11 (mut i32) (i32.const 0))
+  (global $native_hook12 (mut i32) (i32.const 0))
+  (global $native_hook13 (mut i32) (i32.const 0))
+  (global $native_hook14 (mut i32) (i32.const 0))
+  (global $native_hook15 (mut i32) (i32.const 0))
   (global $handler_hist_last (mut i32) (i32.const -1))
   (global $branch_hist_kind (mut i32) (i32.const 0))
   (global $branch_hist_operand (mut i32) (i32.const 0))
@@ -3332,6 +3345,12 @@
   ;; the next expected trigger it is answered instead of parked, so the guest
   ;; polls the real clock through the last stretch, as it would on Windows.
   (global $qpc_fine (mut i32) (i32.const 0))
+  ;; D3D9 caps report unconditional non-power-of-two textures (per app,
+  ;; `d3d9FullNpot` in lib/apps.js). See $d3d9_fill_caps.
+  (global $d3d9_full_npot (mut i32) (i32.const 0))
+  ;; CheckDeviceFormat reports DXT textures unavailable (per app,
+  ;; `d3d9HideDxt`). See $handle_IDirect3D9_CheckDeviceFormat.
+  (global $d3d9_hide_dxt (mut i32) (i32.const 0))
   (global $qpc_fine_seq (mut i32) (i32.const 0))       ;; $spin_nonpoll_seq at the last site read
   (global $qpc_fine_last (mut i64) (i64.const 0))      ;; µs of the last site read
   (global $qpc_fine_frame (mut i64) (i64.const 0))     ;; µs the previous wait ended

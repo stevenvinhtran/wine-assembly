@@ -54,6 +54,8 @@ const {REGIONS}=require('../lib/region-map.generated.js');
         (i32.const 1) (local.get $out)) (i32.load offset=0 (global.get $reg_base)))
     (func (export "lock") (param $t i32) (param $level i32) (param $out i32) (param $rect i32) (result i32)
       (call $d3d9_texture_lock (local.get $t) (local.get $level) (local.get $out) (local.get $rect) (i32.const 0)) (i32.load offset=0 (global.get $reg_base)))
+    (func (export "lock_flags") (param $t i32) (param $level i32) (param $out i32) (param $flags i32) (result i32)
+      (call $d3d9_texture_lock (local.get $t) (local.get $level) (local.get $out) (i32.const 0) (local.get $flags)) (i32.load offset=0 (global.get $reg_base)))
     (func (export "unlock") (param $t i32) (param $level i32) (result i32)
       (call $handle_IDirect3DTexture9_UnlockRect (local.get $t) (local.get $level) (i32.const 0)
         (i32.const 0) (i32.const 0) (i32.const 0)) (i32.load offset=0 (global.get $reg_base)))
@@ -113,6 +115,11 @@ const {REGIONS}=require('../lib/region-map.generated.js');
     assert.strictEqual(e.unlock(t,level),0);assert.strictEqual(e.unlock(t,level)>>>0,0x8876086c);
   }
   [2,1,5,3].forEach((v,i)=>e.guest_write32(rect+i*4,v));
+  // D3DLOCK_DONOTWAIT (0x4000) is a defined texture LockRect flag; an
+  // undefined bit (0x1) is still refused.
+  assert.strictEqual(e.lock_flags(t,0,locked,0x4000),0,'DONOTWAIT locks');
+  assert.strictEqual(e.unlock(t,0),0);
+  assert.strictEqual(e.lock_flags(t,0,locked,0x1)>>>0,0x8876086c,'undefined lock flag refused');
   assert.strictEqual(e.lock(t,0,locked,rect),0);
   assert.strictEqual(e.guest_read32(locked),32);
   assert.strictEqual(e.guest_read32(locked+4)>>>0,original+40);
@@ -165,6 +172,18 @@ const {REGIONS}=require('../lib/region-map.generated.js');
     assert.strictEqual(e.unlock(lum,0),0);
     assert.strictEqual(e.release_texture(lum),0);
   }
+  // d3d9HideDxt (MBAACC): DXT textures are reported unavailable so D3DX picks
+  // an uncompressed format instead of compressing at load, but a direct
+  // CreateTexture with a DXT format is still honoured.
+  e.set_d3d9_hide_dxt(1);
+  for(const format of [Texture.DXT1,Texture.DXT3,Texture.DXT5])
+    assert.strictEqual(e.check_format(0,3,format)>>>0,0x8876086a,`hidden DXT ${format} is refused`);
+  for(const format of [21,22])
+    assert.strictEqual(e.check_format(0,3,format),0,`uncompressed ${format} still accepted with DXT hidden`);
+  assert.strictEqual(e.texture(d,8,4,1,out,Texture.DXT5),0,'direct DXT5 CreateTexture still succeeds');
+  assert.strictEqual(e.release_texture(e.guest_read32(out)),0);
+  e.set_d3d9_hide_dxt(0);
+  assert.strictEqual(e.check_format(0,3,Texture.DXT5),0,'DXT5 accepted again once the flag is off');
   // A format we cannot store must be refused, and CheckDeviceFormat has to say
   // so first: a yes there followed by a refusal here is what left the slot NULL.
   assert.strictEqual(e.texture(d,8,4,1,out,41)>>>0,0x8876086c,'P8 is not stored');
