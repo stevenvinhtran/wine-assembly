@@ -64,6 +64,49 @@ one-shot. Tests cover both paths against the real audio host.
 
 ## Current validation boundary
 
+### Visible-browser CPU comparison (2026-10-12)
+
+Run evidence: `scratch/runs/mbaa-lag-20261012/browser-profile.json`, collected
+from the existing local browser on engine `a6ce9c300` using the built-in host
+and thread profiling hooks and `WinePerf`. No screenshot establishes which
+exact scene was displayed; the user was asked to remain on a laggy screen.
+The first sample counted 10 visible seconds. The comparison then counted
+5 visible seconds normally, 5 with only the worker whose entry is `0x40faf0`
+suspended, and 5 after restoring its original suspend count. A 60-second
+timeout also restored the worker. Reported rates are guest presentations,
+not a separately verified game simulation/frame counter.
+
+| Sample | Guest presentations/sec | Step p90 |
+| --- | ---: | ---: |
+| Normal playback | 17.94 | 22.16 ms |
+| Music worker temporarily suspended | 31.00 | 9.64 ms |
+| Worker restored | 15.56 | 17.65 ms |
+
+The restored phase includes decoder catch-up after the pause; it is not an
+independent steady-state benchmark. Some mouse movement occurred during the
+suspended phase, so the comparison is evidence of a large decoder cost, not
+a precise speedup guarantee across all scenes.
+
+During the initial 10-second sample, worker `0x40faf0` used 4,190.5 ms across
+1,789 slices, while worker `0x489b80` used only 4.4 ms. Decoder samples fall in
+`0x4fxxxx`–`0x512xxx`; disassembly includes floating-point PCM conversion at
+`0x4f4465`. Main-thread samples remain concentrated in the game's resource/
+scene routines around `0x4bdfxx`, `0x4be3xx`, `0x4c03xx`, and `0x4c1bxx`, plus
+its timing routine at `0x41fexx`. End-of-slice locations are directional
+evidence, not exact per-function CPU attribution. The low compositor timing
+does not rule out graphics work performed inside guest execution.
+
+The output-only silent trial could not exclude decoder overhead. The worker
+pause improves throughput but does not reach 60, so neither muting nor the
+worklet promotion alone resolves the remaining lag. Further optimization needs
+to address both guest decoder and main-thread execution costs; no additional
+unmeasured scheduler changes were made for this comparison.
+
+Music was restored and verified: the persistent suppression key was removed,
+`suppressLoopingOutput` is false, music-thread suspend count is zero, and the
+active looping voice is on AudioWorklet. All temporary profiling hooks and the
+main-slice wrapper restored themselves.
+
 ### Browser log: heap exhaustion on entering battle (2026-10-12)
 
 The user's `Desktop/log.txt` contains 1,065 spawned loader threads. At line
