@@ -132,4 +132,54 @@ assert(rb.stats.skipped > skipped, 'they skip it');
   assert.strictEqual(route.hook(0x42b460, rex), false, 'later confirmations run the game code');
 }
 
+// Controller (netplay): inputs, turbo, and a stalled frame answered with
+// "still running" without simulating it.
+{
+  const { MbaaSfxFilter } = require('../lib/mbaa-rollback');
+  const regs = { esp: 0x7e1000, eip: 0, eax: 0 };
+  const cex = Object.assign({}, ex, { get_esp: () => regs.esp, set_esp: v => { regs.esp = v; },
+    set_eip: v => { regs.eip = v; }, set_eax: v => { regs.eax = v; } });
+  w32(0x7e1000, 0x40d355);                     // return address into the message loop
+  w32(0x774A80, 3579545); w32(0x55D25C, 0);
+  const calls = [];
+  const ctl = {
+    n: 0,
+    onFrame(api) {
+      this.n++;
+      calls.push(this.n);
+      if (this.n === 1) { api.setInputs({ p1: { dir: 4, btn: 0x10 }, p2: { dir: 6, btn: 0 } }); api.setTurbo(true); }
+      if (this.n === 2) api.skip();
+      if (this.n === 3) { api.setTurbo(false); api.setInputs({ p1: {}, p2: {} }); }
+    },
+  };
+  const sfxState = { frame: -1, resim: false, from: -1, to: -1 };
+  const net = new MbaaRollback({ eip: 0x40e390 }, { getBuffer: () => buffer, publish: false,
+    controller: () => ctl, sfx: sfxState, inputSource: () => null });
+  assert.strictEqual(net.hook(0x40e390, cex), false, 'a simulated frame runs as guest code');
+  assert.strictEqual(dv.getUint16(g2w(INPUTS + 0x18), true), 4, 'controller inputs written');
+  assert.strictEqual(r32(0x774A80), 1, 'turbo: limiter frequency 1');
+  assert.strictEqual(r32(0x55D25C), 1, 'turbo: frame not drawn');
+  w32(0x55D25C, 0);                            // the game counts it down
+  assert.strictEqual(net.hook(0x40e390, cex), true, 'a stalled frame is answered');
+  assert.deepStrictEqual([regs.eax, regs.eip, regs.esp], [1, 0x40d355, 0x7e1004], 'returns 1 to the loop');
+  regs.esp = 0x7e1000;
+  net.hook(0x40e390, cex);
+  assert.strictEqual(r32(0x774A80), 3579545, 'turbo off restores the frequency');
+  assert.strictEqual(net.stats.stalls, 1);
+
+  // Sound filter: a re-run does not replay what already played in its window.
+  const sfx = new MbaaSfxFilter({ eip: 0x4de200 }, { getBuffer: () => buffer, state: sfxState });
+  const trig = ids => { new Uint8Array(buffer, g2w(0x76E008), 1500).fill(0); for (const i of ids) dv.setUint8(g2w(0x76E008 + i), 1); };
+  const flags = () => { const a = new Uint8Array(buffer, g2w(0x76E008), 1500); return [...a.keys()].filter(i => a[i] === 1); };
+  Object.assign(sfxState, { frame: 10, resim: false, from: -1, to: -1 }); trig([3, 7]);
+  assert.strictEqual(sfx.hook(0x4de200, ex), false); assert.deepStrictEqual(flags(), [3, 7], 'normal frame untouched');
+  Object.assign(sfxState, { frame: 11, resim: false }); trig([]); sfx.hook(0x4de200, ex);
+  Object.assign(sfxState, { frame: 10, resim: true, from: 10, to: 12 }); trig([3, 9]);
+  sfx.hook(0x4de200, ex);
+  assert.deepStrictEqual(flags(), [9], 'already-played 3 suppressed, new 9 plays');
+  Object.assign(sfxState, { frame: 11, resim: true, from: 10, to: 12 }); trig([7]);
+  sfx.hook(0x4de200, ex);
+  assert.deepStrictEqual(flags(), [], '7 played at frame 10 originally: not again one frame later');
+}
+
 console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch located at ${rb.stats.firstMismatch.first}, state ${rb.stats.stateBytes} bytes`);

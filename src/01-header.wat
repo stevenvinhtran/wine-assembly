@@ -2679,7 +2679,7 @@
   (global $sbh_eip_a (mut i32) (i32.const 0))
   (global $sbh_eip_b (mut i32) (i32.const 0))
   ;; Guest function entries the host may answer natively (per-app, opt-in,
-  ;; sixteen slots;
+  ;; twenty-four slots;
   ;; MBAACC's Vorbis fill routine, D3DX's A8R8G8B8 row encoder). Checked where
   ;; the $sbh_eip pair is: $run asks $host_native_hook at an entry, and block
   ;; transfers to one return to $run instead of chaining. Setting a slot bumps
@@ -2701,6 +2701,14 @@
   (global $native_hook13 (mut i32) (i32.const 0))
   (global $native_hook14 (mut i32) (i32.const 0))
   (global $native_hook15 (mut i32) (i32.const 0))
+  (global $native_hook16 (mut i32) (i32.const 0))
+  (global $native_hook17 (mut i32) (i32.const 0))
+  (global $native_hook18 (mut i32) (i32.const 0))
+  (global $native_hook19 (mut i32) (i32.const 0))
+  (global $native_hook20 (mut i32) (i32.const 0))
+  (global $native_hook21 (mut i32) (i32.const 0))
+  (global $native_hook22 (mut i32) (i32.const 0))
+  (global $native_hook23 (mut i32) (i32.const 0))
   ;; A statically linked MSVC _ftol2 entry answered in WAT ($native_ftol in
   ;; 13-exports.wat): ST(0) truncated to a signed i64 in EDX:EAX, popped,
   ;; return. Same semantics as $handle__ftol for the imported one. Set per app

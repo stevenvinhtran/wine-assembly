@@ -4740,7 +4740,8 @@ class WineAssembly {
       'd3dx-dxt3-decode': 'native-dxt-decode', 'd3dx-dxt5-decode': 'native-dxt-decode',
       'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate',
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
-      'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route' };
+      'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route',
+      'mbaa-sfx-filter': 'sfx-filter' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4771,15 +4772,26 @@ class WineAssembly {
         this._mbaaRoute = new MbaaModeRoute(cfg, { mode });
         return this._mbaaRoute;
       },
+      // Netplay's repeated-sound filter (lib/mbaa-rollback.js MbaaSfxFilter).
+      'mbaa-sfx-filter': cfg => {
+        const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
+        if (typeof MbaaSfxFilter !== 'function' || !(embed && embed.netplay)) return null;
+        this._mbaaSfxState = this._mbaaSfxState || { frame: -1, resim: false, from: -1, to: -1 };
+        return new MbaaSfxFilter(cfg, { getBuffer: () => this.memory.buffer, state: this._mbaaSfxState });
+      },
       'mbaa-rollback-frame': cfg => {
         if (typeof MbaaRollback !== 'function') return null;
         const selfTest = !!(q && q.has('rollback-test'));
         const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
         const bridge = !!(embed && embed.input === 'launcher');
-        if (!selfTest && !bridge) return null;
+        const netplay = !!(embed && embed.netplay);
+        if (!selfTest && !bridge && !netplay) return null;
         return new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg),
           selfTest, window: Number(q && q.get('rollback-window')) || 8, route: this._mbaaRoute || null,
           guestMs: () => this._guestMainMs || 0, hostSteps: () => this._stepTicks | 0,
+          // Netplay (melty-web's RollbackCore, set by the launcher on this window).
+          controller: netplay ? () => (typeof window.__waFrameController === 'object' ? window.__waFrameController : null) : null,
+          sfx: netplay ? (this._mbaaSfxState || (this._mbaaSfxState = { frame: -1, resim: false, from: -1, to: -1 })) : null,
           inputSource: bridge ? frame => (typeof window.__waInputSource === 'function' ? window.__waInputSource(frame) : null) : null });
       },
       'd3dx-matrix-multiply': cfg => typeof NativeD3dxMatrix === 'function' && new NativeD3dxMatrix(cfg, {
@@ -4797,7 +4809,7 @@ class WineAssembly {
         this.logToUI(`[native-hook] msvc-ftol2 at 0x${(cfg.va >>> 0).toString(16)} (WAT)`);
         continue;
       }
-      if (slot > 15 || !cfg || !(make[cfg.kind] || /^d3dx-dxt(-color|3|5)-decode$/.test(cfg.kind))) continue;
+      if (slot > 23 || !cfg || !(make[cfg.kind] || /^d3dx-dxt(-color|3|5)-decode$/.test(cfg.kind))) continue;
       if (q && q.get(off[cfg.kind]) === '0') continue;
       let eip = cfg.va >>> 0;
       if (cfg.module) {

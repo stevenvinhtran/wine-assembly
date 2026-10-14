@@ -5729,9 +5729,10 @@
               (then
                 (local.set $side (i32.const 1))
                 (br $done)))))
-        ;; The same side exit for a host-answered entry ($native_hook0..3),
+        ;; The same side exit for a host-answered entry ($native_hook0..23, or
+        ;; the WAT _ftol2 entry),
         ;; so $run sees it however the region reached it.
-        (if (i32.or (i32.or (i32.or (i32.or (global.get $native_hook0) (global.get $native_hook1)) (i32.or (global.get $native_hook2) (global.get $native_hook3))) (i32.or (i32.or (global.get $native_hook4) (global.get $native_hook5)) (i32.or (global.get $native_hook6) (global.get $native_hook7)))) (i32.or (i32.or (i32.or (global.get $native_hook8) (global.get $native_hook9)) (i32.or (global.get $native_hook10) (global.get $native_hook11))) (i32.or (i32.or (global.get $native_hook12) (global.get $native_hook13)) (i32.or (global.get $native_hook14) (global.get $native_hook15)))))
+        (if (i32.or (i32.or (i32.or (i32.or (i32.or (global.get $native_hook0) (global.get $native_hook1)) (i32.or (global.get $native_hook2) (global.get $native_hook3))) (i32.or (i32.or (global.get $native_hook4) (global.get $native_hook5)) (i32.or (global.get $native_hook6) (global.get $native_hook7)))) (i32.or (i32.or (i32.or (global.get $native_hook8) (global.get $native_hook9)) (i32.or (global.get $native_hook10) (global.get $native_hook11))) (i32.or (i32.or (global.get $native_hook12) (global.get $native_hook13)) (i32.or (global.get $native_hook14) (global.get $native_hook15))))) (i32.or (i32.or (i32.or (i32.or (global.get $native_hook16) (global.get $native_hook17)) (i32.or (global.get $native_hook18) (global.get $native_hook19))) (i32.or (i32.or (global.get $native_hook20) (global.get $native_hook21)) (i32.or (global.get $native_hook22) (global.get $native_hook23)))) (global.get $native_ftol_eip)))
           (then
             (local.set $exit_eip
               (i32.load offset=48

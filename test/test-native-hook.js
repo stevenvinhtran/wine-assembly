@@ -100,6 +100,14 @@ const ITER = 300;
   assert.strictEqual(hook.calls, 0, 'disarmed again: host not asked');
   assert.strictEqual(r.esi, ITER * 0x77, 'disarmed again: F result');
 
+  // The highest slot (24 in all) works like the first.
+  e.set_native_hook(23, F); hook.calls = 0;
+  assert.strictEqual(e.get_native_hook(23) >>> 0, F, 'slot 23 armed');
+  r = run('slot 23');
+  assert.strictEqual(hook.calls, ITER, 'slot 23: host asked every call');
+  assert.strictEqual(r.marked, 0, 'slot 23: F body never ran');
+  e.set_native_hook(23, 0);
+
   // A cooperative guest thread inherits the hook: MBAACC's fill runs on its
   // music thread, and an unlisted setter was silently not passed on.
   const { ThreadManager } = require('../lib/thread-manager');

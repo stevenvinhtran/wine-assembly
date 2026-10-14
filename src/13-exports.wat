@@ -1999,7 +1999,7 @@
   ;; does.
   (func (export "set_native_hook") (param $slot i32) (param $eip i32)
     (block $done
-      (br_if $done (i32.gt_u (local.get $slot) (i32.const 15)))
+      (br_if $done (i32.gt_u (local.get $slot) (i32.const 23)))
       (if (i32.eq (local.get $slot) (i32.const 0)) (then (global.set $native_hook0 (local.get $eip))))
       (if (i32.eq (local.get $slot) (i32.const 1)) (then (global.set $native_hook1 (local.get $eip))))
       (if (i32.eq (local.get $slot) (i32.const 2)) (then (global.set $native_hook2 (local.get $eip))))
@@ -2016,6 +2016,14 @@
       (if (i32.eq (local.get $slot) (i32.const 13)) (then (global.set $native_hook13 (local.get $eip))))
       (if (i32.eq (local.get $slot) (i32.const 14)) (then (global.set $native_hook14 (local.get $eip))))
       (if (i32.eq (local.get $slot) (i32.const 15)) (then (global.set $native_hook15 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 16)) (then (global.set $native_hook16 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 17)) (then (global.set $native_hook17 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 18)) (then (global.set $native_hook18 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 19)) (then (global.set $native_hook19 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 20)) (then (global.set $native_hook20 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 21)) (then (global.set $native_hook21 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 22)) (then (global.set $native_hook22 (local.get $eip))))
+      (if (i32.eq (local.get $slot) (i32.const 23)) (then (global.set $native_hook23 (local.get $eip))))
       (call $chain_bump)))
   (func (export "get_native_hook") (param $slot i32) (result i32)
     (if (i32.eq (local.get $slot) (i32.const 0)) (then (return (global.get $native_hook0))))
@@ -2034,12 +2042,20 @@
     (if (i32.eq (local.get $slot) (i32.const 13)) (then (return (global.get $native_hook13))))
     (if (i32.eq (local.get $slot) (i32.const 14)) (then (return (global.get $native_hook14))))
     (if (i32.eq (local.get $slot) (i32.const 15)) (then (return (global.get $native_hook15))))
+    (if (i32.eq (local.get $slot) (i32.const 16)) (then (return (global.get $native_hook16))))
+    (if (i32.eq (local.get $slot) (i32.const 17)) (then (return (global.get $native_hook17))))
+    (if (i32.eq (local.get $slot) (i32.const 18)) (then (return (global.get $native_hook18))))
+    (if (i32.eq (local.get $slot) (i32.const 19)) (then (return (global.get $native_hook19))))
+    (if (i32.eq (local.get $slot) (i32.const 20)) (then (return (global.get $native_hook20))))
+    (if (i32.eq (local.get $slot) (i32.const 21)) (then (return (global.get $native_hook21))))
+    (if (i32.eq (local.get $slot) (i32.const 22)) (then (return (global.get $native_hook22))))
+    (if (i32.eq (local.get $slot) (i32.const 23)) (then (return (global.get $native_hook23))))
     (i32.const 0))
   ;; Is $eip a nonzero armed native-hook entry (or the WAT _ftol2 entry)?
   (func $native_hook_at (param $eip i32) (result i32)
     (i32.and (i32.ne (local.get $eip) (i32.const 0))
       (i32.or (i32.eq (local.get $eip) (global.get $native_ftol_eip))
-        (i32.or (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook0)) (i32.eq (local.get $eip) (global.get $native_hook1))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook2)) (i32.eq (local.get $eip) (global.get $native_hook3)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook4)) (i32.eq (local.get $eip) (global.get $native_hook5))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook6)) (i32.eq (local.get $eip) (global.get $native_hook7))))) (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook8)) (i32.eq (local.get $eip) (global.get $native_hook9))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook10)) (i32.eq (local.get $eip) (global.get $native_hook11)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook12)) (i32.eq (local.get $eip) (global.get $native_hook13))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook14)) (i32.eq (local.get $eip) (global.get $native_hook15)))))))))
+        (i32.or (i32.or (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook0)) (i32.eq (local.get $eip) (global.get $native_hook1))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook2)) (i32.eq (local.get $eip) (global.get $native_hook3)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook4)) (i32.eq (local.get $eip) (global.get $native_hook5))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook6)) (i32.eq (local.get $eip) (global.get $native_hook7))))) (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook8)) (i32.eq (local.get $eip) (global.get $native_hook9))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook10)) (i32.eq (local.get $eip) (global.get $native_hook11)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook12)) (i32.eq (local.get $eip) (global.get $native_hook13))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook14)) (i32.eq (local.get $eip) (global.get $native_hook15)))))) (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook16)) (i32.eq (local.get $eip) (global.get $native_hook17))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook18)) (i32.eq (local.get $eip) (global.get $native_hook19)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook20)) (i32.eq (local.get $eip) (global.get $native_hook21))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook22)) (i32.eq (local.get $eip) (global.get $native_hook23)))))))))
   ;; MSVC _ftol2 (x87 path): ST(0) -> signed i64 in EDX:EAX under truncation,
   ;; ST(0) popped, the caller's control word untouched; cdecl, pops only the
   ;; return address. Mirrors $handle__ftol.
