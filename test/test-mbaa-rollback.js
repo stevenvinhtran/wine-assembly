@@ -232,3 +232,40 @@ console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch lo
   require('assert').deepStrictEqual(timer.stats.resimMs, [1, 3, 4]);
   console.log('mbaa stage timer PASS');
 }
+
+// Training reset (CCCaster's directional FN2 reset), frame by frame.
+{
+  const { TrainingReset } = require('../lib/mbaa-rollback.js');
+  const assert = require('assert');
+  const sx = a => dv.getInt32(g2w(a), true);
+  const step = (tr, dir, btn) => tr.filter(ex, { dir, btn });
+  const place = () => { w32(0x555238, -0x4000); w32(0x555D34, 0x4000); w32(0x74D7F8, 0); };
+  // Left: dummy in the left corner, player next to it, camera left; FN2 held 10 frames.
+  let tr = new TrainingReset(); place();
+  assert.strictEqual(step(tr, 4, 0x200).btn & 0x200, 0x200);
+  assert.strictEqual(r32(0x76E708), 0x32, 'the game reset timer is set');
+  w32(0x555238, -0x4000); w32(0x555D34, 0x4000);        // the game's own reset placement
+  assert.strictEqual(step(tr, 4, 0x200).btn & 0x200, 0x200);
+  assert.deepStrictEqual([sx(0x555238), sx(0x555D34), sx(0x564B14)], [-0xB000, -0xF000, -0x6800]);
+  step(tr, 5, 0); assert.strictEqual(tr.state, -1, 'release rearms');
+  // Right and down.
+  tr = new TrainingReset(); place(); step(tr, 6, 0x200); step(tr, 6, 0x200);
+  assert.deepStrictEqual([sx(0x555238), sx(0x555D34), sx(0x564B14)], [0xB000, 0xF000, 0x6800]);
+  tr = new TrainingReset(); place(); step(tr, 2, 0x200); step(tr, 5, 0x200);
+  assert.deepStrictEqual([sx(0x555238), sx(0x555D34)], [0x4000, -0x4000], 'down: center, sides swapped');
+  // Neutral: the game's reset; held past 10 frames, sides swap once.
+  tr = new TrainingReset(); place(); step(tr, 5, 0x200);
+  for (let i = 0; i < 11; i++) step(tr, 5, 0x200);
+  assert.deepStrictEqual([sx(0x555238), sx(0x555D34)], [-0x4000, 0x4000], 'neutral keeps the game positions for 10 frames');
+  step(tr, 5, 0x200);
+  assert.deepStrictEqual([sx(0x555238), sx(0x555D34)], [0x4000, -0x4000], 'long neutral hold swaps sides');
+  step(tr, 5, 0x200);
+  assert.deepStrictEqual([sx(0x555238), sx(0x555D34)], [0x4000, -0x4000], 'once');
+  // Long left hold: the player goes into the corner.
+  tr = new TrainingReset(); place(); for (let i = 0; i < 13; i++) step(tr, 4, 0x200);
+  assert.strictEqual(sx(0x555238), -0x10000);
+  // Not while the training state says 5 / -1.
+  tr = new TrainingReset(); place(); w32(0x74D7F8, 5);
+  assert.strictEqual(step(tr, 4, 0x200).btn, 0x200); assert.strictEqual(tr.state, -1);
+  console.log('training reset PASS');
+}

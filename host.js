@@ -4798,6 +4798,8 @@ class WineAssembly {
         return new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg),
           selfTest, window: Number(q && q.get('rollback-window')) || 8, route: this._mbaaRoute || null,
           lockCharaSelect: !!(embed && (embed.mode || embed.netplay)),
+          training: !!(embed && embed.mode === 'training' && !embed.netplay),
+          netplay,
           guestMs: () => this._guestMainMs || 0, hostSteps: () => this._stepTicks | 0,
           stages: () => this._mbaaStages || null,   // its checkpoints are armed after this hook
           // Netplay (melty-web's RollbackCore, set by the launcher on this window).
