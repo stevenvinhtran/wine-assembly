@@ -4123,6 +4123,50 @@ class WineAssembly {
     return this._backgroundAssetsPromise;
   }
 
+  // Read every streamed file whole into memory, in the background, after the
+  // guest is running: from then on no read waits on disk or network. Two
+  // chunk requests at a time, smallest file first; a chunk the guest asks for
+  // meanwhile shares the same request. `paused()` (the embedding page's
+  // window.__waResidentPause) holds the fill, e.g. during a netplay battle so
+  // a bulk download never competes with the input stream.
+  startResidentFill() {
+    if (this._residentPromise || !this._residentJobs || !this._residentJobs.length) return this._residentPromise || null;
+    const jobs = this._residentJobs.splice(0).sort((a, b) => a.cache.size - b.cache.size);
+    const signal = this._manifestAssetAbort && this._manifestAssetAbort.signal;
+    const total = jobs.reduce((n, j) => n + j.cache.size, 0);
+    const state = this.residentFill = { total, loaded: 0, files: jobs.length, done: false, failed: 0 };
+    const paused = () => {
+      try { return typeof window !== 'undefined' && typeof window.__waResidentPause === 'function' && !!window.__waResidentPause(); }
+      catch (_) { return false; }
+    };
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    this._residentPromise = (async () => {
+      for (const job of jobs) {
+        const cs = job.cache.chunkSize, size = job.cache.size;
+        let next = 0;
+        const worker = async () => {
+          for (;;) {
+            if (signal && signal.aborted) return;
+            while (paused()) { await sleep(250); if (signal && signal.aborted) return; }
+            const at = next; next += cs;
+            if (at >= size) return;
+            const len = Math.min(cs, size - at);
+            for (let tries = 0; tries < 3; tries++) {
+              try { await job.cache.fill(at, len); break; }
+              catch (_) { if (tries === 2) state.failed++; else await sleep(1000); }
+            }
+            state.loaded += len;
+          }
+        };
+        await Promise.all([worker(), worker()]);
+        if (signal && signal.aborted) return state;
+      }
+      state.done = true;
+      return state;
+    })();
+    return this._residentPromise;
+  }
+
   async loadFiles(urls, options = {}) {
     const transferOpts = options.transfer || {};
     const checkCancelled = () => WineAssembly._throwIfAssetAborted(transferOpts.signal);
@@ -4248,6 +4292,12 @@ class WineAssembly {
                 // read-ahead/prefetch only while reads are sequential
                 // (lib/byte-provider.js ChunkCache), bounded per file (4GB cache to prevent eviction).
                 const cache = window.byteProvider.cached(provider, { maxChunks: 4096 });
+                // Apps that keep their data resident: every streamed file is
+                // read whole into memory after launch (startResidentFill).
+                if (this.residentFiles === true) {
+                  if (!this._residentJobs) this._residentJobs = [];
+                  this._residentJobs.push({ url, cache });
+                }
                 if (item.loadMode === 'background') {
                   if (!this._backgroundAssetJobs) this._backgroundAssetJobs = [];
                   if (this._backgroundAssetJobs.length < 8) this._backgroundAssetJobs.push({url, cache});
