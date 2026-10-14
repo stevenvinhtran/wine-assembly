@@ -4741,7 +4741,7 @@ class WineAssembly {
       'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate',
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
       'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route',
-      'mbaa-sfx-filter': 'sfx-filter' };
+      'mbaa-sfx-filter': 'sfx-filter', 'mbaa-frame-stage': 'rollback-test' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4779,6 +4779,11 @@ class WineAssembly {
         this._mbaaSfxState = this._mbaaSfxState || { frame: -1, resim: false, from: -1, to: -1 };
         return new MbaaSfxFilter(cfg, { getBuffer: () => this.memory.buffer, state: this._mbaaSfxState });
       },
+      'mbaa-frame-stage': cfg => {
+        if (typeof MbaaStageTimer !== 'function' || !(q && q.has('rollback-test'))) return null;
+        this._mbaaStages = this._mbaaStages || new MbaaStageTimer();
+        return this._mbaaStages.checkpoint(cfg);
+      },
       'mbaa-rollback-frame': cfg => {
         if (typeof MbaaRollback !== 'function') return null;
         const selfTest = !!(q && q.has('rollback-test'));
@@ -4789,6 +4794,7 @@ class WineAssembly {
         return new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg),
           selfTest, window: Number(q && q.get('rollback-window')) || 8, route: this._mbaaRoute || null,
           guestMs: () => this._guestMainMs || 0, hostSteps: () => this._stepTicks | 0,
+          stages: () => this._mbaaStages || null,   // its checkpoints are armed after this hook
           // Netplay (melty-web's RollbackCore, set by the launcher on this window).
           controller: netplay ? () => (typeof window.__waFrameController === 'object' ? window.__waFrameController : null) : null,
           sfx: netplay ? (this._mbaaSfxState || (this._mbaaSfxState = { frame: -1, resim: false, from: -1, to: -1 })) : null,

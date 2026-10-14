@@ -197,3 +197,23 @@ assert(rb.stats.skipped > skipped, 'they skip it');
 }
 
 console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch located at ${rb.stats.firstMismatch.first}, state ${rb.stats.stateBytes} bytes`);
+
+// Stage timer: segments between checkpoints, split by re-run and normal frames.
+{
+  const { MbaaStageTimer } = require('../lib/mbaa-rollback.js');
+  let t = 0;
+  const timer = new MbaaStageTimer(() => t);
+  const cps = [0x432c50, 0x4330c0].map(eip => timer.checkpoint({ eip }));
+  for (let f = 0; f < 20; f++) {
+    const resim = f >= 10;
+    timer.frameStart(!resim && f > 0 ? false : f > 10);   // the frame that just ended
+    // Out of order on purpose: the second checkpoint arrives first.
+    t += 1; cps[1].hook(0x4330c0); t += resim ? 4 : 2; cps[0].hook(0x432c50); cps[1].hook(0x4330c0); t += 3;
+  }
+  timer.frameStart(true);
+  timer._publish();
+  require('assert').deepStrictEqual(timer.stats.stages, ['start', '0x432c50', '0x4330c0']);
+  require('assert').deepStrictEqual(timer.stats.normalMs, [1, 3, 2]);
+  require('assert').deepStrictEqual(timer.stats.resimMs, [1, 3, 4]);
+  console.log('mbaa stage timer PASS');
+}
