@@ -182,3 +182,12 @@ if (st && st.stages) {
     console.log(`  ${String(name).padEnd(10)} re-run ${r == null ? '-' : r.toFixed(3).padStart(7)}   normal ${n == null ? '-' : n.toFixed(3).padStart(7)}`);
   });
 }
+
+// Interpreter handlers (x86 ops by kind) during profiled re-runs, written
+// for tools/browser-handler-hist.js to name: --handlers=FILE.
+const handlersOut = (args.find(a => a.startsWith('--handlers=')) || '').slice(11);
+if (handlersOut && p.handlers && p.handlers.length) {
+  const ops = p.handlers.reduce((s, h) => s + h[1], 0);
+  fs.writeFileSync(handlersOut, JSON.stringify({ handlers: p.handlers, ops, blocks: [], blockHits: 0 }));
+  console.log(`\nhandler histogram (${ops.toLocaleString()} ops) written to ${handlersOut}: node tools/browser-handler-hist.js ${handlersOut}`);
+}
