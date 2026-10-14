@@ -4213,6 +4213,8 @@ class WineAssembly {
                 const lifetimeSignal = sizedRange ? this._manifestAssetAbort.signal : null;
                 const rangeOptions = {
                   validateRange: sizedRange,
+                  // Apps that opt in keep every fetched range on disk.
+                  persist: this.persistRanges === true,
                   // Only launch-time discovery belongs to this AbortSignal.
                   // The provider retains this adapter for later gameplay GETs;
                   // those must remain usable after the launch controller ends.
