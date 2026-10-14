@@ -46,10 +46,10 @@ function gameFrame() {
   if (r32(0x774A80) === 1) sawTurbo++;
 }
 
-const rb = new MbaaRollback({ eip: 0x40d330 }, { getBuffer: () => buffer, selfTest: true, window: 6, everyFrames: 24, publish: false });
+const rb = new MbaaRollback({ eip: 0x40e390 }, { getBuffer: () => buffer, selfTest: true, window: 6, everyFrames: 24, publish: false });
 const run = n => {
-  for (let i = 0; i < n; i++) { rb.hook(0x40d330, ex); gameFrame(); }
-  while (rb.phase !== 'idle') { rb.hook(0x40d330, ex); gameFrame(); }
+  for (let i = 0; i < n; i++) { rb.hook(0x40e390, ex); gameFrame(); }
+  while (rb.phase !== 'idle') { rb.hook(0x40e390, ex); gameFrame(); }
 };
 
 // Round trip.
@@ -77,7 +77,7 @@ noise = false;
 
 // Changing inputs during the window: skipped, not failed.
 const fails = rb.stats.fails, skipped = rb.stats.skipped;
-for (let i = 0; i < 200; i++) { dv.setUint8(g2w(INPUTS + 0x18), i % 3); rb.hook(0x40d330, ex); gameFrame(); }
+for (let i = 0; i < 200; i++) { dv.setUint8(g2w(INPUTS + 0x18), i % 3); rb.hook(0x40e390, ex); gameFrame(); }
 assert.strictEqual(rb.stats.fails, fails, 'changing inputs never fail the test');
 assert(rb.stats.skipped > skipped, 'they skip it');
 
@@ -85,16 +85,32 @@ assert(rb.stats.skipped > skipped, 'they skip it');
 // frame boundary (neutral 5 stored as 0), and the game's keyboard mapping is
 // kept zeroed so physical keys cannot add to it.
 {
+  const SITES = [[0x41F098, [0x89, 0x06]], [0x41F0A0, [0x89, 0x46, 0x0C]], [0x4A024E, [0x89, 0x07]],
+    [0x4A027F, [0x09, 0x57, 0x0C]], [0x4A0291, [0x09, 0x57, 0x0C]], [0x4A02A2, [0x09, 0x57, 0x0C]],
+    [0x4A02B4, [0x09, 0x57, 0x0C]], [0x4A02E9, [0x89, 0x17]], [0x4A02F2, [0x09, 0x47, 0x0C]]];
+  // Unexpected code at a site: nothing is patched and no input is written.
+  const wrong = new MbaaRollback({ eip: 0x40e390 }, { getBuffer: () => buffer, publish: false,
+    inputSource: () => ({ p1: { dir: 6, btn: 0x10 }, p2: { dir: 5, btn: 0 } }) });
+  dv.setUint16(g2w(INPUTS + 0x18), 0, true);
+  wrong.hook(0x40e390, ex);
+  assert.strictEqual(dv.getUint16(g2w(INPUTS + 0x18), true), 0, 'mismatched code: no input written');
+  assert(/mismatch/.test(wrong.stats.inputTakeover), 'and the mismatch is reported');
+  for (const [va, bytes] of SITES) bytes.forEach((b, i) => dv.setUint8(g2w(va + i), b));
+  const invalidated = [];
+  ex.invalidate_code_range = (va, len) => invalidated.push([va, len]);
   for (let i = 0; i < 20; i++) dv.setUint8(g2w(0x54D2C0 + i), i + 1);
   const seen = [];
-  const bridge = new MbaaRollback({ eip: 0x40d330 }, { getBuffer: () => buffer, publish: false,
+  const bridge = new MbaaRollback({ eip: 0x40e390 }, { getBuffer: () => buffer, publish: false,
     inputSource: f => { seen.push(f); return { p1: { dir: 6, btn: 0x10 | 0x400 }, p2: { dir: 5, btn: 0x20 } }; } });
-  bridge.hook(0x40d330, ex);
+  bridge.hook(0x40e390, ex);
   const u16 = a => dv.getUint16(g2w(a), true);
   assert.deepStrictEqual([u16(INPUTS + 0x18), u16(INPUTS + 0x24), u16(INPUTS + 0x2C), u16(INPUTS + 0x38)],
     [6, 0x410, 0, 0x20], 'P1/P2 direction and buttons written');
   assert(new Uint8Array(buffer, g2w(0x54D2C0), 20).every(b => b === 0), 'keyboard mapping zeroed');
   assert.deepStrictEqual(seen, [1], 'source asked once per frame with the frame number');
+  for (const [va, bytes] of SITES) bytes.forEach((b, i) => assert.strictEqual(dv.getUint8(g2w(va + i)), 0x90, `0x${va.toString(16)} removed`));
+  assert.strictEqual(invalidated.length, SITES.length, 'decoded copies of the patched code are discarded');
+  delete ex.invalidate_code_range;
 }
 
 // Mode route: the first menu confirmation runs the prologue and lands on the
