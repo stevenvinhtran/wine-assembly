@@ -677,6 +677,17 @@ class WineAssembly {
       }
     }
     const wait = this._gameWait || null;
+    // Parked-read statistics for embedders' logs (melty-web's netplay log):
+    // every guest read that had to wait for data, and how long.
+    const ps = this.parkStats || (this.parkStats = { count: 0, totalMs: 0, maxMs: 0, failures: 0, recent: [] });
+    const parkedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const notePark = failed => {
+      const ms = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - parkedAt;
+      ps.count++; ps.totalMs += ms; ps.maxMs = Math.max(ps.maxMs, ms);
+      if (failed) ps.failures++;
+      ps.recent.push({ file: String(pending.path || '').replace(/^.*\\/, ''), offset: pending.offset, ms: Math.round(ms), failed: !!failed });
+      if (ps.recent.length > 12) ps.recent.shift();
+    };
     const chunk = cache.chunkSize || 0;
     const first = chunk ? Math.floor(pending.offset / chunk) : 0;
     const last = chunk ? Math.floor((pending.offset + Math.max(1, pending.length) - 1) / chunk) : 0;
@@ -692,6 +703,7 @@ class WineAssembly {
         try {
           await cache.fill(pending.offset, pending.length);
           if (wait) wait.progress(token, total || 0);
+          notePark(false);
           break;
         } catch (error) {
           if (!this.running) throw error;
@@ -700,6 +712,7 @@ class WineAssembly {
             continue;
           }
           this.logToUI(`[io] ${pending.path}: ${error && error.message}`);
+          notePark(true);
           const answer = wait ? await wait.fail(token, error) : 'quit';
           if (!this.running) return false;
           if (answer === 'retry' && this.running) { attempt = 0; continue; }
