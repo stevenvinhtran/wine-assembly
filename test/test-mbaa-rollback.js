@@ -269,3 +269,20 @@ console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch lo
   assert.strictEqual(step(tr, 4, 0x200).btn, 0x200); assert.strictEqual(tr.state, -1);
   console.log('training reset PASS');
 }
+
+// Menu block: RETURN_TITLE / EXIT_VS_GAME never match; other items run the game's test.
+{
+  const { MbaaMenuBlock } = require('../lib/mbaa-rollback.js');
+  const assert = require('assert');
+  const regs = { esp: 0x7e1000, eip: 0, eax: 7, ecx: 0 };
+  const mex = Object.assign({}, ex, { get_ecx: () => regs.ecx, get_esp: () => regs.esp, set_esp: v => { regs.esp = v; },
+    set_eip: v => { regs.eip = v; }, set_eax: v => { regs.eax = v; }, set_ecx: v => { regs.ecx = v; } });
+  w32(0x7e1000, 0x44dae2);
+  const mb = new MbaaMenuBlock({ eip: 0x42bdc0 });
+  regs.ecx = 0x537718;   // CHARACTER_SELECT
+  assert.strictEqual(mb.hook(0x42bdc0, mex), false, 'other items: the game decides');
+  regs.ecx = 0x535CE8;   // RETURN_TITLE
+  assert.strictEqual(mb.hook(0x42bdc0, mex), true);
+  assert.deepStrictEqual([regs.eax, regs.eip, regs.esp], [0, 0x44dae2, 0x7e1004], 'answered "no match" and returned');
+  console.log('menu block PASS');
+}

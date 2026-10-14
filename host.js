@@ -4742,7 +4742,7 @@ class WineAssembly {
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
       'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route',
       'mbaa-sfx-filter': 'sfx-filter', 'mbaa-frame-stage': 'rollback-test',
-      'mbaa-gfx-skip': 'native-gfx-skip', 'mbaa-move-skip': 'native-move-skip' };
+      'mbaa-gfx-skip': 'native-gfx-skip', 'mbaa-move-skip': 'native-move-skip', 'mbaa-menu-block': 'menu-block' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4783,6 +4783,11 @@ class WineAssembly {
       'mbaa-gfx-skip': cfg => typeof NativeMbaaGfxSkip === 'function' && new NativeMbaaGfxSkip(cfg, {
         getBuffer: () => this.memory.buffer }),
       'mbaa-move-skip': cfg => typeof NativeMbaaMoveSkip === 'function' && new NativeMbaaMoveSkip(cfg),
+      'mbaa-menu-block': cfg => {
+        const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
+        if (typeof MbaaMenuBlock !== 'function' || !(embed && (embed.mode || embed.netplay))) return null;
+        return new MbaaMenuBlock(cfg);
+      },
       'mbaa-frame-stage': cfg => {
         if (typeof MbaaStageTimer !== 'function' || !(q && q.has('rollback-test'))) return null;
         this._mbaaStages = this._mbaaStages || new MbaaStageTimer();
@@ -4800,6 +4805,7 @@ class WineAssembly {
           lockCharaSelect: !!(embed && (embed.mode || embed.netplay)),
           training: !!(embed && embed.mode === 'training' && !embed.netplay),
           netplay,
+          noPause: !!(embed && embed.mode && embed.mode !== 'training'),
           guestMs: () => this._guestMainMs || 0, hostSteps: () => this._stepTicks | 0,
           stages: () => this._mbaaStages || null,   // its checkpoints are armed after this hook
           // Netplay (melty-web's RollbackCore, set by the launcher on this window).
