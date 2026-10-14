@@ -81,4 +81,39 @@ for (let i = 0; i < 200; i++) { dv.setUint8(g2w(INPUTS + 0x18), i % 3); rb.hook(
 assert.strictEqual(rb.stats.fails, fails, 'changing inputs never fail the test');
 assert(rb.stats.skipped > skipped, 'they skip it');
 
+// Input bridge: the source's frame is written to both players' slots at the
+// frame boundary (neutral 5 stored as 0), and the game's keyboard mapping is
+// kept zeroed so physical keys cannot add to it.
+{
+  for (let i = 0; i < 20; i++) dv.setUint8(g2w(0x54D2C0 + i), i + 1);
+  const seen = [];
+  const bridge = new MbaaRollback({ eip: 0x40d330 }, { getBuffer: () => buffer, publish: false,
+    inputSource: f => { seen.push(f); return { p1: { dir: 6, btn: 0x10 | 0x400 }, p2: { dir: 5, btn: 0x20 } }; } });
+  bridge.hook(0x40d330, ex);
+  const u16 = a => dv.getUint16(g2w(a), true);
+  assert.deepStrictEqual([u16(INPUTS + 0x18), u16(INPUTS + 0x24), u16(INPUTS + 0x2C), u16(INPUTS + 0x38)],
+    [6, 0x410, 0, 0x20], 'P1/P2 direction and buttons written');
+  assert(new Uint8Array(buffer, g2w(0x54D2C0), 20).every(b => b === 0), 'keyboard mapping zeroed');
+  assert.deepStrictEqual(seen, [1], 'source asked once per frame with the frame number');
+}
+
+// Mode route: the first menu confirmation runs the prologue and lands on the
+// chosen branch; later ones run the game's own code.
+{
+  const { MbaaModeRoute } = require('../lib/mbaa-rollback');
+  const regs = { esp: 0x7e0000, eip: 0, eax: 0, ecx: 0x11, ebx: 0x22, edi: 0x33 };
+  const rex = Object.assign({}, ex, {
+    get_esp: () => regs.esp, set_esp: v => { regs.esp = v; }, set_eip: v => { regs.eip = v; },
+    set_eax: v => { regs.eax = v; }, set_edi: v => { regs.edi = v; },
+    get_ecx: () => regs.ecx, get_ebx: () => regs.ebx, get_edi: () => regs.edi });
+  w32(0x76E6D4, 0x700000);
+  const route = new MbaaModeRoute({ eip: 0x42b460 }, { mode: 'training' });
+  assert.strictEqual(route.hook(0x42b460, rex), true, 'first confirmation is routed');
+  assert.strictEqual(regs.eip, 0x42B499, 'to TRAINING_MOD');
+  assert.strictEqual(regs.esp, 0x7e0000 - 12, 'prologue pushes three registers');
+  assert.deepStrictEqual([r32(0x7e0000 - 4), r32(0x7e0000 - 8), r32(0x7e0000 - 12)], [0x11, 0x22, 0x33]);
+  assert.deepStrictEqual([regs.eax, regs.edi], [0x700000, 0x700020], 'eax/edi as the prologue leaves them');
+  assert.strictEqual(route.hook(0x42b460, rex), false, 'later confirmations run the game code');
+}
+
 console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch located at ${rb.stats.firstMismatch.first}, state ${rb.stats.stateBytes} bytes`);

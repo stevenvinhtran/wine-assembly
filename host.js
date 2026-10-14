@@ -4740,7 +4740,7 @@ class WineAssembly {
       'd3dx-dxt3-decode': 'native-dxt-decode', 'd3dx-dxt5-decode': 'native-dxt-decode',
       'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate',
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
-      'mbaa-rollback-frame': 'rollback-test' };
+      'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4758,10 +4758,29 @@ class WineAssembly {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
       'mbaa-limiter-sleep': cfg => typeof NativeMbaaLimiter === 'function' && new NativeMbaaLimiter(cfg),
       'mbaa-spin-limiter': cfg => typeof NativeMbaaSpinLimiter === 'function' && new NativeMbaaSpinLimiter(cfg),
-      // Rollback groundwork (lib/mbaa-rollback.js): armed only for ?rollback-test.
-      'mbaa-rollback-frame': cfg => typeof MbaaRollback === 'function' && q && q.has('rollback-test') &&
-        new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg), selfTest: true,
-          window: Number(q.get('rollback-window')) || 8 }),
+      // The game-frame hook (lib/mbaa-rollback.js): armed for ?rollback-test
+      // (the restore/re-run self-test) and for a launcher that owns input
+      // (?embed with input: 'launcher'; it sets window.__waInputSource).
+      // Launcher mode entry (lib/mbaa-rollback.js MbaaModeRoute): armed only
+      // when the embedding launcher names a mode. Listed before the frame
+      // hook, which drives the menus to it.
+      'mbaa-mode-route': cfg => {
+        const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
+        const mode = embed && embed.mode;
+        if (typeof MbaaModeRoute !== 'function' || !mode || !MbaaModeRoute.TARGETS[mode]) return null;
+        this._mbaaRoute = new MbaaModeRoute(cfg, { mode });
+        return this._mbaaRoute;
+      },
+      'mbaa-rollback-frame': cfg => {
+        if (typeof MbaaRollback !== 'function') return null;
+        const selfTest = !!(q && q.has('rollback-test'));
+        const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
+        const bridge = !!(embed && embed.input === 'launcher');
+        if (!selfTest && !bridge) return null;
+        return new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg),
+          selfTest, window: Number(q && q.get('rollback-window')) || 8, route: this._mbaaRoute || null,
+          inputSource: bridge ? frame => (typeof window.__waInputSource === 'function' ? window.__waInputSource(frame) : null) : null });
+      },
       'd3dx-matrix-multiply': cfg => typeof NativeD3dxMatrix === 'function' && new NativeD3dxMatrix(cfg, {
         getBuffer: () => this.memory.buffer }),
       'zlib-inflate': cfg => typeof NativeInflate === 'function' && new NativeInflate(cfg, {

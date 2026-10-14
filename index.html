@@ -11,6 +11,23 @@
     // counts its 500ms from navigation start (startedAt 0 on the
     // performance.now() clock): lib/launch-progress.js picks this up as soon
     // as it loads. ?debug keeps the old page, toolbar and all.
+    // ?embed: this page is the runtime inside a product page's iframe
+    // (melty-web's launcher). The launch config travels in the fragment
+    // (#launch=<base64url JSON>) so it is in place before the boot reads
+    // it; lib/embed-host.js reports progress back to the parent.
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (!q.has('embed')) return;
+      document.documentElement.classList.add('embed');
+      var m = /(?:^#|&)launch=([^&]*)/.exec(location.hash || '');
+      if (!m) return;
+      try {
+        var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+        var json = decodeURIComponent(Array.prototype.map.call(atob(b64),
+          function (c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join(''));
+        window.__waEmbedConfig = JSON.parse(json);
+      } catch (e) { window.__waEmbedConfigError = String(e && e.message || e); }
+    })();
     (function () {
       var q = new URLSearchParams(location.search);
       var id = q.get('app');
@@ -657,6 +674,14 @@
       user-select: none; -webkit-user-select: none;
     }
     .wa-launch[hidden], .wa-launch.wa-launch-minimized { display: none; }
+    /* ?embed: the embedding page owns every piece of UI. Only the game's
+       surface is drawn, on black; progress and errors go to the parent. */
+    html.embed .wa-launch, html.embed #taskbar, html.embed #start-menu,
+    html.embed #desktop-icons, html.embed #build-stamp, html.embed #compile-status,
+    html.embed #readme-window, html.embed #debug-peek, html.embed #titlebar,
+    html.embed #toolbar, html.embed #log, html.embed #page-fullscreen-exit,
+    html.embed #browser-fullscreen-consent, html.embed #page-fullscreen-hint { display: none !important; }
+    html.embed, html.embed body { background: #000 !important; }
     .wa-launch [hidden] { display: none !important; }
     .wa-launch-titlebar {
       display: flex; align-items: center; gap: 4px; margin: 2px; padding: 2px 3px; height: 18px;
@@ -2027,6 +2052,7 @@ Resource-aware Win98 emulator
       // Second: a direct ?app= link's launch window counts its 500ms from
       // navigation start, so it has to be live while the rest still loads.
       "lib/launch-progress.js",
+      "lib/embed-host.js",
       // The in-game wait window for game data still downloading.
       "lib/game-wait.js",
       "lib/mem-utils.js",
@@ -2161,6 +2187,7 @@ Resource-aware Win98 emulator
     // `?single-app=1` / `?single-app=0` forces it either way for testing.
     function detectSingleAppMode() {
       const params = new URLSearchParams(location.search);
+      if (params.has('embed')) return true;
       if (params.has('single-app')) return params.get('single-app') !== '0';
       // ?debug does not opt out: debugging a phone layout is exactly when the
       // zoom has to be on. `?debug&single-app=0` turns it off explicitly.
