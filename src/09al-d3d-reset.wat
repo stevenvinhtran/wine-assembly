@@ -168,6 +168,10 @@
   (call $d3d9_depth_unbind (i32.load offset=21752 (local.get $old))) (call $d3d9_depth_unbind (i32.load offset=21756 (local.get $old)))
   (call $d3d9_lights_free (i32.load offset=21996 (local.get $old)))
   (call $d3d9_color_unbind (i32.load offset=22020 (local.get $old)))
+  ;; Render-target slots 1-3 ($d3d9_color_binding_extra) hold references too.
+  (call $d3d9_color_unbind (i32.load offset=25616 (local.get $old)))
+  (call $d3d9_color_unbind (i32.load offset=25620 (local.get $old)))
+  (call $d3d9_color_unbind (i32.load offset=25624 (local.get $old)))
   (call $heap_free (local.get $state)) (call $heap_free (local.get $shared))
   (drop (call $dx_surface_release (i32.load offset=20 (local.get $wa))))
   (global.set $d3d9_windowed_hwnd (select (i32.load offset=48 (local.get $wa)) (i32.const 0) (i32.load offset=44 (local.get $wa))))

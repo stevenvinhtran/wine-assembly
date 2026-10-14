@@ -453,6 +453,11 @@
 (func $d3d9_color_binding (param $device i32) (param $index i32) (param $surface i32)
   (local $state i32) (local $old i32) (local $wa i32) (local $rt i32) (local $storage i32) (local $parent i32)
   (i32.store offset=0 (global.get $reg_base) (i32.const 0x8876086c))
+  ;; Slots 1-3 (multiple render targets) only where the app opted into the
+  ;; programmable profile that writes them ($d3d9_ps20); see below.
+  (if (i32.and (i32.ne (global.get $d3d9_ps20) (i32.const 0))
+        (i32.and (i32.ge_u (local.get $index) (i32.const 1)) (i32.le_u (local.get $index) (i32.const 3)))) (then
+    (call $d3d9_color_binding_extra (local.get $device) (local.get $index) (local.get $surface)) (return)))
   (if (i32.or (local.get $index) (i32.eqz (local.get $surface))) (then (return)))
   (local.set $state (call $d3d9_program_state (local.get $device)))
   (if (i32.eqz (local.get $state)) (then (return)))
@@ -486,6 +491,35 @@
   (call $d3d9_color_unbind (local.get $old))
   (memory.fill (i32.add (local.get $state) (i32.const 21728)) (i32.const 0) (i32.const 24))
   (memory.fill (i32.add (local.get $state) (i32.const 22000)) (i32.const 0) (i32.const 20))
+  (i32.store offset=0 (global.get $reg_base) (i32.const 0)))
+
+
+;; Render-target slots 1-3, held at device state +25616/+25620/+25624 (zero =
+;; unbound). The same color storage and reference rules as slot 0, but NULL
+;; is legal here (it unbinds) and no viewport/scissor reset applies. The
+;; backend replays a pixel shader's oC1-oC3 writes into these targets, and
+;; Clear clears them with slot 0.
+(func $d3d9_color_binding_extra (param $device i32) (param $index i32) (param $surface i32)
+  (local $state i32) (local $slot i32) (local $old i32) (local $wa i32) (local $storage i32) (local $parent i32)
+  (local.set $state (call $d3d9_program_state (local.get $device)))
+  (if (i32.eqz (local.get $state)) (then (return)))
+  (local.set $slot (i32.add (call $g2w (local.get $state)) (i32.add (i32.const 25612) (i32.shl (local.get $index) (i32.const 2)))))
+  (local.set $old (i32.load (local.get $slot)))
+  (if (local.get $surface) (then
+    (local.set $storage (call $d3d9_color_storage (local.get $surface)))
+    (if (i32.eqz (local.get $storage)) (then (return)))
+    (local.set $surface (local.get $storage))
+    (local.set $wa (call $g2w (local.get $surface)))
+    (if (i32.or (i32.ne (i32.load offset=8 (local.get $wa)) (local.get $device))
+      (i32.or (i32.ne (i32.load offset=64 (local.get $wa)) (i32.const 1))
+        (i32.ne (i32.load offset=56 (local.get $wa)) (i32.const 0)))) (then (return)))
+    (local.set $parent (i32.load offset=72 (local.get $wa)))
+    (if (local.get $parent) (then
+      (call $gs32 (i32.add (local.get $parent) (i32.const 20))
+        (i32.add (call $gl32 (i32.add (local.get $parent) (i32.const 20))) (i32.const 1)))))
+    (i32.store offset=16 (local.get $wa) (i32.add (i32.load offset=16 (local.get $wa)) (i32.const 1)))))
+  (i32.store (local.get $slot) (local.get $surface))
+  (call $d3d9_color_unbind (local.get $old))
   (i32.store offset=0 (global.get $reg_base) (i32.const 0)))
 
 (func $d3d9_color_desc (param $surface i32) (param $out i32)

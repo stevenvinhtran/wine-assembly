@@ -315,6 +315,8 @@
       ;; already returned to the caller; on 0 the guest code runs below.
       (if (call $native_hook_at (global.get $eip))
         (then
+          (if (i32.eq (global.get $eip) (global.get $native_ftol_eip))
+            (then (call $native_ftol) (br $main)))
           (if (call $host_native_hook (global.get $eip))
             (then (br $main)))))
       ;; The page index is the only lookup there is now: it is exact, so a miss
@@ -718,7 +720,7 @@
   ;; copying just the cursors would lose frees or mischarge live allocations.
   (func (export "get_heap_arena_record") (result i32) (global.get $heap_arena_record))
   (func (export "get_heap_sparse_record") (result i32) (global.get $heap_sparse_record))
-  (func (export "get_heap_large_free") (result i32) (global.get $heap_large_free))
+  (func (export "get_heap_large_free") (result i32) (call $heap_large_head))
   (func (export "adopt_heap_state")
     (param $ptr i32) (param $end i32) (param $record i32)
     (param $sparse_ptr i32) (param $sparse_end i32) (param $sparse_record i32)
@@ -730,7 +732,10 @@
     (global.set $heap_sparse_end (local.get $sparse_end))
     (global.set $heap_sparse_record (local.get $sparse_record))
     (global.set $free_list (local.get $free))
-    (global.set $heap_large_free (local.get $large_free)))
+    ;; $large_free is accepted for the call's shape and ignored: the large
+    ;; list is process-wide now, so there is nothing per instance to hand over
+    ;; (and clearing it here would drop every thread's freed blocks).
+    (drop (local.get $large_free)))
   ;; Publish the process heap base + chunk cursor. The PE loader calls the same
   ;; function; exported so a harness can set a heap up without a real image.
   (func (export "heap_init") (param i32) (call $heap_init (local.get 0)))
@@ -2030,12 +2035,35 @@
     (if (i32.eq (local.get $slot) (i32.const 14)) (then (return (global.get $native_hook14))))
     (if (i32.eq (local.get $slot) (i32.const 15)) (then (return (global.get $native_hook15))))
     (i32.const 0))
-  ;; Is $eip a nonzero armed native-hook entry?
+  ;; Is $eip a nonzero armed native-hook entry (or the WAT _ftol2 entry)?
   (func $native_hook_at (param $eip i32) (result i32)
     (i32.and (i32.ne (local.get $eip) (i32.const 0))
-      (i32.or (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook0)) (i32.eq (local.get $eip) (global.get $native_hook1))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook2)) (i32.eq (local.get $eip) (global.get $native_hook3)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook4)) (i32.eq (local.get $eip) (global.get $native_hook5))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook6)) (i32.eq (local.get $eip) (global.get $native_hook7))))) (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook8)) (i32.eq (local.get $eip) (global.get $native_hook9))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook10)) (i32.eq (local.get $eip) (global.get $native_hook11)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook12)) (i32.eq (local.get $eip) (global.get $native_hook13))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook14)) (i32.eq (local.get $eip) (global.get $native_hook15))))))))
+      (i32.or (i32.eq (local.get $eip) (global.get $native_ftol_eip))
+        (i32.or (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook0)) (i32.eq (local.get $eip) (global.get $native_hook1))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook2)) (i32.eq (local.get $eip) (global.get $native_hook3)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook4)) (i32.eq (local.get $eip) (global.get $native_hook5))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook6)) (i32.eq (local.get $eip) (global.get $native_hook7))))) (i32.or (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook8)) (i32.eq (local.get $eip) (global.get $native_hook9))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook10)) (i32.eq (local.get $eip) (global.get $native_hook11)))) (i32.or (i32.or (i32.eq (local.get $eip) (global.get $native_hook12)) (i32.eq (local.get $eip) (global.get $native_hook13))) (i32.or (i32.eq (local.get $eip) (global.get $native_hook14)) (i32.eq (local.get $eip) (global.get $native_hook15)))))))))
+  ;; MSVC _ftol2 (x87 path): ST(0) -> signed i64 in EDX:EAX under truncation,
+  ;; ST(0) popped, the caller's control word untouched; cdecl, pops only the
+  ;; return address. Mirrors $handle__ftol.
+  (func $native_ftol
+    (local $saved_cw i32) (local $value i64) (local $esp i32)
+    (local.set $saved_cw (global.get $fpu_cw))
+    (global.set $fpu_cw (i32.or (local.get $saved_cw) (i32.const 0x0C00)))
+    (local.set $value (call $fpu_to_i64 (call $fpu_pop)))
+    (global.set $fpu_cw (local.get $saved_cw))
+    (i32.store offset=0 (global.get $reg_base) (i32.wrap_i64 (local.get $value)))
+    (i32.store offset=8 (global.get $reg_base) (i32.wrap_i64 (i64.shr_u (local.get $value) (i64.const 32))))
+    (local.set $esp (i32.load offset=16 (global.get $reg_base)))
+    (global.set $eip (call $gl32 (local.get $esp)))
+    (i32.store offset=16 (global.get $reg_base) (i32.add (local.get $esp) (i32.const 4)))
+    (global.set $native_ftol_count (i32.add (global.get $native_ftol_count) (i32.const 1))))
+  (func (export "set_native_ftol") (param $eip i32)
+    (global.set $native_ftol_eip (local.get $eip))
+    (call $chain_bump))
+  (func (export "get_native_ftol_count") (result i32) (global.get $native_ftol_count))
   (func (export "set_d3d9_hide_dxt") (param $on i32)
     (global.set $d3d9_hide_dxt (i32.ne (local.get $on) (i32.const 0))))
+  (func (export "get_d3d9_texture_oom") (result i32) (global.get $d3d9_texture_oom))
+  (func (export "set_d3d9_ps20") (param $on i32)
+    (global.set $d3d9_ps20 (i32.ne (local.get $on) (i32.const 0))))
   (func (export "set_d3d9_full_npot") (param $on i32)
     (global.set $d3d9_full_npot (i32.ne (local.get $on) (i32.const 0))))
   (func (export "set_qpc_fine") (param $on i32)

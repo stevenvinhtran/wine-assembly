@@ -2476,6 +2476,11 @@
   ;; compare-and-swap ($th_lock_rmw). +36: that handler's split-lock mutex.
   (global $LOCK_MODE i32 (region.addr $SHARED_COUNTERS 0x00000020))
   (global $LOCK_MUTEX i32 (region.addr $SHARED_COUNTERS 0x00000024))
+  ;; +48/+52: lock (owner, depth) and +56: head of the process-wide list of
+  ;; freed large heap blocks ($heap_large_head in 10-helpers.wat). Shared, not
+  ;; per instance: a block freed by one guest thread must be reusable by any.
+  (global $LOCK_HEAP_LARGE i32 (region.addr $SHARED_COUNTERS 0x00000030))
+  (global $HEAP_LARGE_FREE_SHARED i32 (region.addr $SHARED_COUNTERS 0x00000038))
   (global $CLASS_ATOM_BASE i32 (i32.const 0xC000))
   ;; 256 bytes of scratch that belong to the TEST HARNESS, not to the emulator.
   ;; No WAT reads any of it. The layout is fixed by offset so tests in separate
@@ -2696,6 +2701,13 @@
   (global $native_hook13 (mut i32) (i32.const 0))
   (global $native_hook14 (mut i32) (i32.const 0))
   (global $native_hook15 (mut i32) (i32.const 0))
+  ;; A statically linked MSVC _ftol2 entry answered in WAT ($native_ftol in
+  ;; 13-exports.wat): ST(0) truncated to a signed i64 in EDX:EAX, popped,
+  ;; return. Same semantics as $handle__ftol for the imported one. Set per app
+  ;; (MBAACC calls it ~100,000 times a second in effect-heavy scenes, four
+  ;; interpreted blocks each). 0 = off.
+  (global $native_ftol_eip (mut i32) (i32.const 0))
+  (global $native_ftol_count (mut i32) (i32.const 0))
   (global $handler_hist_last (mut i32) (i32.const -1))
   (global $branch_hist_kind (mut i32) (i32.const 0))
   (global $branch_hist_operand (mut i32) (i32.const 0))
@@ -2735,6 +2747,11 @@
   (global $heap_arena_record (mut i32) (i32.const 0))
   (global $HEAP_ARENAS i32 (region.addr $HEAP_ARENAS 0))
   (global $HEAP_ARENAS_SIZE i32 (region.size $HEAP_ARENAS))
+  ;; Arena records the table holds. Every block of $HEAP_LARGE or more is an
+  ;; arena of its own, and so is every instance's sparse chunk; a game that
+  ;; streams assets through a thread per file (MBAACC) went through 1024 in a
+  ;; few battles, and a full table is a NULL from HeapAlloc.
+  (global $HEAP_ARENA_MAX i32 (i32.const 4096))
   ;; Left in a released record's live-bytes word by $heap_arena_release_free.
   ;; It is what tells a slot that has been handed back apart from one that was
   ;; never used: only the first is claimed again, so a table whose every slot
@@ -3351,6 +3368,10 @@
   ;; CheckDeviceFormat reports DXT textures unavailable (per app,
   ;; `d3d9HideDxt`). See $handle_IDirect3D9_CheckDeviceFormat.
   (global $d3d9_hide_dxt (mut i32) (i32.const 0))
+  ;; Per-app opt-in: accept ps_2_0 pixel shaders (lib/apps.js d3d9PS20).
+  (global $d3d9_ps20 (mut i32) (i32.const 0))
+  ;; CreateTexture calls refused for want of guest heap (perf-stream counter).
+  (global $d3d9_texture_oom (mut i32) (i32.const 0))
   (global $qpc_fine_seq (mut i32) (i32.const 0))       ;; $spin_nonpoll_seq at the last site read
   (global $qpc_fine_last (mut i64) (i64.const 0))      ;; µs of the last site read
   (global $qpc_fine_frame (mut i64) (i64.const 0))     ;; µs the previous wait ended

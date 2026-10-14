@@ -118,6 +118,24 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
   assert.deepStrictEqual(recovered.textureReleases,['t1'],'and the assumed key is released first');
   const settled=await host.draw();
   assert.strictEqual(settled.textures[4].pixels,undefined);assert.strictEqual(settled.textureReleases,undefined);
+  // The guest releases the texture (0x30013, every texture kind): its
+  // converted level is dropped from the snapshot cache and the next draw
+  // releases its resident copy -- it no longer waits for the budget.
+  const snapBytes=host.bridge._textureSnapshotBytes;
+  host.set(40512+8,7);
+  assert.strictEqual(host.bridge.call(0x30013,40512,7),1,'texture retirement accepted');
+  assert.strictEqual(host.bridge._textureSnapshots.has(40512+64),false,'snapshot dropped');
+  assert.strictEqual(host.bridge._textureSnapshotBytes,snapBytes-4,'snapshot bytes returned');
+  assert.strictEqual(host.bridge.devices.get(7).resident.has('t1'),false,'resident key dropped');
+  host.texture(4,40640,42080,[6,20,30,255]);
+  const afterRelease=await host.draw();
+  assert.deepStrictEqual(afterRelease.textureReleases,['t1'],'the next draw releases the retired level');
+  assert.strictEqual(host.bridge.devices.get(7).residentBytes,4,'only the live level stays resident');
+  // New content at the same mip record releases the old level's key at once.
+  host.set(40640+64+28,99);new Uint8Array(host.bridge.options.getMemory(),42080,4).set([7,20,30,255]);
+  const rewritten=await host.draw();
+  assert.notStrictEqual(rewritten.textures[4].key,afterRelease.textures[4].key,'rewritten level gets a new key');
+  assert.deepStrictEqual(rewritten.textureReleases,[afterRelease.textures[4].key],'and its old key is released');
   await host.bridge.close();
   // Zero budget: a key stays resident only while the draw in hand uses it.
   const tight=fixture({maxResidentTextureBytes:0});

@@ -1284,10 +1284,14 @@
     (local.set $wa (call $g2w (local.get $obj)))
     (if (i32.or (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 3))
       (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 5))) (then
-      (if (i32.load offset=56 (local.get $wa)) (then
-        ;; The broker copies all IDs into one ordered retirement command.
-        ;; Its executor storage is independent of this canonical allocation.
-        (drop (call $host_gpu_gl_call (i32.const 0x30013) (local.get $wa) (i32.load offset=8 (local.get $wa))))))))
+      ;; Every texture, not only render targets: the host also drops its
+      ;; converted copies of this texture's levels (keyed by their mip records)
+      ;; and releases them from the device. Before, a released texture's
+      ;; copies stayed until the 512 MB budget forced them out, so a long
+      ;; session sat pinned at the budget evicting and re-uploading per draw.
+      ;; For a render-target texture the broker also copies all color IDs into
+      ;; one ordered retirement command.
+      (drop (call $host_gpu_gl_call (i32.const 0x30013) (local.get $wa) (i32.load offset=8 (local.get $wa))))))
     (if (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xd3d90003)) (then
       (call $d3d9_lights_free (i32.load offset=22312 (local.get $wa)))
       (call $d3d9_shader_unbind (i32.load offset=22052 (local.get $wa)))
@@ -1830,13 +1834,20 @@
       (local.set $i (i32.add (local.get $i) (i32.const 1)))
       (br_if $size (i32.lt_u (local.get $i) (local.get $levels))))
     (local.set $obj (call $heap_alloc (local.get $bytes)))
-    (if (i32.eqz (local.get $obj)) (then (i32.store offset=0 (global.get $reg_base) (i32.const 0x8007000E)) (return)))
+    (if (i32.eqz (local.get $obj)) (then
+      ;; Counted for the perf stream: a texture the game asked for and did not get.
+      (global.set $d3d9_texture_oom (i32.add (global.get $d3d9_texture_oom) (i32.const 1)))
+      (i32.store offset=0 (global.get $reg_base) (i32.const 0x8007000E)) (return)))
     (local.set $wa (call $g2w (local.get $obj)))
     (call $zero_memory (local.get $wa) (local.get $bytes))
     ;; This allocation may reuse a released texture's mip records: move the
     ;; device's texture generation so the host re-checks its snapshots.
     (local.set $state (i32.add (call $d3d9_program_state (local.get $device)) (i32.const 25596)))
     (call $gs32 (local.get $state) (i32.add (call $gl32 (local.get $state)) (i32.const 1)))
+    ;; +60 texture identity: the generation this texture was created under,
+    ;; unique per device. lib/d3d9-host.js keys its snapshot cache on it, so a
+    ;; recycled mip record can never serve the previous texture's pixels.
+    (i32.store offset=60 (local.get $wa) (call $gl32 (local.get $state)))
     (local.set $vtbl (global.get $DX_VTBL_D3DTEX9))
     (if (i32.eq (local.get $kind) (i32.const 5)) (then
       (local.set $state (call $d3d9_program_state (local.get $device)))

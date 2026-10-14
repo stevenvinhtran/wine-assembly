@@ -625,7 +625,7 @@
   (region.declare $CS_TABLE (size 0x00000400) (align 0x00000010)
     (stride 0x4 (count $CS_TABLE_ENTRIES))
     (owner "09a-handlers3-sync.wat:$cs_slot"))
-  (region.declare $SHARED_COUNTERS (size 0x00000030) (align 0x00000010)
+  (region.declare $SHARED_COUNTERS (size 0x00000040) (align 0x00000010)
     (owner "01-header.wat:$SHARED_COUNTERS"))
   (region.declare $CLIPBOARD_SEQUENCE (size 0x00000004) (align 0x00000004)
     (owner "01-header.wat:$CLIPBOARD_SEQUENCE"))
@@ -902,7 +902,8 @@
   ;; $THREAD_CACHE_BASE carves.
   (region.declare $LOCAL_POST_QUEUES (size 0x00004000) (align 0x00000010)
     (owner "10-helpers.wat:$post_queue_base"))
-  (region.declare $HEAP_ARENAS (size 0x00004010) (align 0x00000010)
+  ;; 16-byte header + 4096 16-byte records ($HEAP_ARENA_MAX).
+  (region.declare $HEAP_ARENAS (size 0x00010010) (align 0x00000010)
     (owner "10-helpers.wat:$heap_arena_register"))
   ;; One process token plus 32 independently closeable handles.  The records
   ;; are emulator-private shared state; the tail holds the immutable classic

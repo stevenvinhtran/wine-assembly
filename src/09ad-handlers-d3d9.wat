@@ -75,9 +75,11 @@
     ;; +25600 actual backbuffer storage format, separate from display mode.
     ;; +25604 D3D8 pixel-shader handle list; +25608 monotonic handle counter.
     ;; +25612 D3D8 vertex-program/declaration handle list.
-    (local.set $state (call $heap_alloc (i32.const 25616)))
+    ;; +25616/+25620/+25624 render-target slots 1-3 ($d3d9_color_binding_extra).
+    ;; +25628 pixel constants c8-c31 (384 bytes, $d3d9_float_constants).
+    (local.set $state (call $heap_alloc (i32.const 26012)))
     (if (i32.eqz (local.get $state)) (then (return (i32.const 0))))
-    (call $zero_memory (call $g2w (local.get $state)) (i32.const 25616))
+    (call $zero_memory (call $g2w (local.get $state)) (i32.const 26012))
     (call $gs32 (i32.add (local.get $state) (i32.const 21780)) (global.get $current_thread_id))
     (loop $texture_stages
       (local.set $sampler (i32.add (call $g2w (local.get $state))
@@ -155,7 +157,9 @@
     (local $state i32) (local $limit i32) (local $offset i32) (local $bytes i32) (local $block i32) (local $dest i32)
     (local $source i32) (local $index i32) (local $n i32) (local $mask i32) (local $value i32)
     (i32.store offset=0 (global.get $reg_base) (i32.const 0x8876086C))
-    (local.set $limit (select (i32.const 8) (i32.const 256) (local.get $pixel)))
+    ;; Pixel constants c0-c7, or c0-c31 where ps_2_0 is enabled ($d3d9_ps20):
+    ;; c8-c31 live at device state +25628 and are not recorded by state blocks.
+    (local.set $limit (select (select (i32.const 32) (i32.const 8) (global.get $d3d9_ps20)) (i32.const 256) (local.get $pixel)))
     (if (i32.gt_u (local.get $start) (local.get $limit)) (then (return)))
     (if (i32.gt_u (local.get $count) (i32.sub (local.get $limit) (local.get $start)))
       (then (return)))
@@ -186,6 +190,16 @@
             (local.set $mask (i32.add (i32.const 23068) (local.get $index)))
             (local.set $value (i32.add (i32.const 23228) (i32.mul (local.get $index) (i32.const 16))))))))
         (local.set $dest (i32.add (call $g2w (local.get $state)) (local.get $offset)))
+        (if (i32.and (local.get $pixel) (i32.ge_u (local.get $index) (i32.const 8))) (then
+          (local.set $dest (i32.add (call $g2w (local.get $state))
+            (i32.add (i32.const 25628) (i32.mul (i32.sub (local.get $index) (i32.const 8)) (i32.const 16)))))
+          (if (local.get $get)
+            (then (memory.copy (local.get $source) (local.get $dest) (i32.const 16)))
+            (else (memory.copy (local.get $dest) (local.get $source) (i32.const 16))))
+          (local.set $source (i32.add (local.get $source) (i32.const 16)))
+          (local.set $n (i32.add (local.get $n) (i32.const 1)))
+          (br_if $registers (i32.lt_u (local.get $n) (local.get $count)))
+          (i32.store offset=0 (global.get $reg_base) (i32.const 0)) (return)))
         (if (local.get $get)
           (then (memory.copy (local.get $source) (local.get $dest) (i32.const 16)))
           (else
@@ -404,6 +418,11 @@
       (i32.or (i32.or (i32.eq (i32.load (local.get $wa)) (i32.const 0xffff0102)) (i32.eq (i32.load (local.get $wa)) (i32.const 0xffff0103)))
         (i32.eq (i32.load (local.get $wa)) (i32.const 0xffff0104))))
       (then (local.set $version (i32.load (local.get $wa)))))
+    ;; ps_2_0 only where an app opted in ($d3d9_ps20): its scanner covers the
+    ;; subset MBAACC's D3DX effects use, not the whole profile.
+    (if (i32.and (i32.and (i32.eq (local.get $version) (i32.const 0xffff0101)) (i32.ne (global.get $d3d9_ps20) (i32.const 0)))
+      (i32.or (i32.eq (i32.load (local.get $wa)) (i32.const 0xffff0200)) (i32.eq (i32.load (local.get $wa)) (i32.const 0xffff0300))))
+      (then (local.set $version (i32.load (local.get $wa)))))
     (if (i32.ne (i32.load (local.get $wa)) (local.get $version)) (then
       (call $d3d9_shader_refuse (i32.load (local.get $wa)) (i32.const 0) (i32.const 0)) (return)))
     (local.set $words (i32.shr_u (i32.sub
@@ -499,9 +518,12 @@
         (select (i32.const 0xffff0101) (i32.const 0xfffe0101) (local.get $pixel)))
         (i32.eqz (i32.or
           (i32.and (i32.eqz (local.get $pixel)) (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xfffe0100)))
-          (i32.and (local.get $pixel) (i32.or (i32.or (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xffff0102))
+          ;; ps_2_0/ps_3_0 objects exist only under $d3d9_ps20 (see create).
+          (i32.and (local.get $pixel) (i32.or (i32.or (i32.or (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xffff0102))
           (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xffff0103)))
-          (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xffff0104))))))) (then (return)))
+          (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xffff0104)))
+          (i32.or (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xffff0200))
+            (i32.eq (i32.load offset=12 (local.get $wa)) (i32.const 0xffff0300)))))))) (then (return)))
     ))
     (local.set $block (call $gl32 (i32.add (local.get $state) (i32.const 1740))))
     (if (local.get $block) (then
@@ -909,7 +931,8 @@
     (i32.store offset=92 (local.get $wa) (i32.const 2048)) ;; MaxTextureHeight
     (i32.store offset=108 (local.get $wa) (i32.const 1)) ;; MaxAnisotropy (no anisotropic filtering)
     (i32.store offset=232 (local.get $wa) (i32.const 1)) ;; NumberOfAdaptersInGroup
-    (i32.store offset=240 (local.get $wa) (i32.const 1)) ;; NumSimultaneousRTs
+    ;; NumSimultaneousRTs: four where the programmable ps_2_0 profile is on.
+    (i32.store offset=240 (local.get $wa) (select (i32.const 4) (i32.const 1) (global.get $d3d9_ps20)))
     (if (i32.eq (call $host_gpu_gl_call (i32.const 0x30005) (i32.const 0) (i32.const 0)) (i32.const 1)) (then
       (i32.store offset=28 (local.get $wa) (i32.const 0x80000)) ;; hardware rasterization
       ;; BLENDOP is real in the software executor; the WebGL executor still
@@ -1179,6 +1202,9 @@
         (if (load.field DxObject misc1 (local.get $entry)) (then
           (call $d3d9_lights_free (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 21996))))
           (call $d3d9_color_unbind (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 22020))))
+          (call $d3d9_color_unbind (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 25616))))
+          (call $d3d9_color_unbind (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 25620))))
+          (call $d3d9_color_unbind (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 25624))))
           (call $d3d9_depth_unbind (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 21752))))
           (call $d3d9_depth_unbind (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 21756))))
           (local.set $parent (call $gl32 (i32.add (load.field DxObject misc1 (local.get $entry)) (i32.const 20628))))

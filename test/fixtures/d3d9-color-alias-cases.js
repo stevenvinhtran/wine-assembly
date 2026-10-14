@@ -22,7 +22,9 @@
   if(copies!==undefined)check(api.copies()===copies,'unchanged resource reuses assembled GPU texture');
   await api.clear([0,1,1,.5],1,1,null,null,0,a);await api.draw(draw(texture));await solid([255,255,0,128],'clear invalidates cached sample');
   const feedback=draw(texture);feedback.colorAttachment=a;let rejected=false;
-  try{await api.draw(feedback);}catch(e){rejected=/feedback/i.test(e.message);}check(rejected,'feedback explicitly rejected');
+  // Sampling the bound target is legal D3D9 (MBAACC's blur composites rely
+  // on it): the draw reads a snapshot taken before it writes.
+  try{await api.draw(feedback);}catch(e){rejected=true;}check(!rejected,'feedback samples a snapshot');
   check((await api.read(a)).pixels.every((v,i)=>Math.abs(v-[255,255,0,128][i%4])<=1),'feedback preserves source');
   const mixed={width:2,height:2,levels:[level(a),{width:1,height:1,pixels:new Uint8Array([91,51,17,255])}],sampler:{...sampler,mip:1,maxMipLevel:1}};
   await api.draw(draw(mixed));await solid([17,51,91,255],'mixed CPU mip selected');

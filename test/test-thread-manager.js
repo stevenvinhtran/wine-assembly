@@ -50,16 +50,21 @@ for (let i = 0; i < tm._maxWorkerThreads; i++) {
   handles.push(handle);
 }
 
-assert.strictEqual(tm.createThread(0x2000, 0, 0), 0, 'all pending slots should block another worker');
+// Every slot busy: the thread is queued (real handle, no slot yet) rather
+// than refused -- see test-thread-slot-queue.js.
+const queued = tm.createThread(0x2000, 0, 0);
+assert(queued, 'all pending slots: another worker is queued, not refused');
 assert.deepStrictEqual(tm._pendingThreads.map(p => p.tid),
-  Array.from({ length: tm._maxWorkerThreads }, (_, index) => index + 1));
+  [...Array.from({ length: tm._maxWorkerThreads }, (_, index) => index + 1), 0]);
 
 for (const pending of tm._pendingThreads) {
-  tm.threads.set(pending.handle, { tid: pending.tid, state: 'active' });
+  if (pending.tid) tm.threads.set(pending.handle, { tid: pending.tid, state: 'active' });
 }
 tm._pendingThreads = [];
 
-assert.strictEqual(tm.createThread(0x3000, 0, 0), 0, 'all active slots should block another worker');
+const queuedActive = tm.createThread(0x3000, 0, 0);
+assert(queuedActive && tm._pendingThreads[0].tid === 0, 'all active slots: queued without a slot');
+tm._pendingThreads = [];
 
 tm.threads.get(handles[0]).state = 'exited';
 const reused = tm.createThread(0x4000, 0, 0);
@@ -67,7 +72,8 @@ assert(reused, 'an exited worker slot should be reusable');
 assert.strictEqual(tm._pendingThreads[0].tid, 1, 'the first exited slot should be reused');
 assert(!tm.threads.has(handles[0]), 'reused exited slot should drop old handle bookkeeping');
 
-assert.strictEqual(tm.createThread(0x5000, 0, 0), 0, 'a pending reused slot still counts as occupied');
+tm.createThread(0x5000, 0, 0);
+assert.strictEqual(tm._pendingThreads[1].tid, 0, 'a pending reused slot still counts as occupied');
 
 const suspendTm = makeThreadManager({ recordThreadEvents: true });
 const suspendedHandle = suspendTm.createThread(0x6000, 0, 0, 0x4);

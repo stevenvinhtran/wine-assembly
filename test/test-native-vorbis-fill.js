@@ -155,5 +155,33 @@ const expectBytes = (fromByte, n) => {
   assert.strictEqual(fresh.hook(0x416ea0, g.ex), false, 'held lock before takeover: declined');
   assert.strictEqual(fresh.stats.decodes, 0, 'and nothing is read under the lock');
 
+  // A reloaded clip (same content, new address) reuses the decoded song,
+  // and a trusted session skips the verification fill.
+  {
+    const p = makeGuest();
+    let decodesP = 0;
+    const mk = () => { const pcm = new Int16Array(FRAMES * CH); for (let f = 0; f < FRAMES; f++) for (let c = 0; c < CH; c++) pcm[f * CH + c] = sample(f, c); return pcm; };
+    const pf = new NativeVorbisFill({ eip: 0x416ea0, lockAddr: LOCK },
+      { getBuffer: () => p.buffer, decodeOgg: async () => { decodesP++; return mk(); } });
+    pf.verifiedSongs = 3;
+    const enter = want => {
+      p.dv.setUint32(ESP, RET, true); p.dv.setUint32(ESP + 4, STREAM, true);
+      p.dv.setUint32(ESP + 8, DST, true); p.dv.setUint32(ESP + 12, 1, true);
+      p.regs.esp = ESP; p.regs.eax = want;
+      return pf.hook(0x416ea0, p.ex);
+    };
+    assert.strictEqual(enter(800), false, 'pending decode: the guest decoder plays (no waiting)');
+    await flush(); await flush();
+    p.dv.setUint32(STREAM + 0x324, 0, true);
+    assert.strictEqual(enter(800), true, 'trusted session: answered without a verification fill');
+    assert.deepStrictEqual(new Uint8Array(p.buffer, DST, 800), expectBytes(0, 800));
+    p.dv.setUint32(STREAM + 0x324, 0, true);
+    const SRC2 = 0x20000;
+    new Uint8Array(p.buffer, SRC2, SRC_SIZE).set(new Uint8Array(p.buffer, SRC, SRC_SIZE));
+    p.dv.setUint32(STREAM + 0x310, SRC2, true);
+    assert.strictEqual(enter(400), true, 'reloaded clip answered at once');
+    assert.strictEqual(decodesP, 1, 'without a second decode');
+  }
+
   console.log(`native vorbis fill PASS (answered ${fill.stats.answered}, declined ${fill.stats.declined})`);
 })().catch(err => { console.error(err); process.exitCode = 1; });

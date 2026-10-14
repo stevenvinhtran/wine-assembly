@@ -1153,12 +1153,26 @@ class WineAssembly {
     // Fine QueryPerformanceCounter (see $qpc_fine): `fineQpc: true` in
     // lib/apps.js, ?fine-qpc[=0] for one load.
     this.fineQpc = false;
+    // `runHidden: true` in lib/apps.js: the guest keeps full speed on a
+    // hidden page -- no hidden pause, parked sleeps and the D3D9 present
+    // cadence on lib/wake-timer.js instead of the throttled page timers, and
+    // a held Web Lock so the browser does not freeze the tab. For a game
+    // whose clock (or a netplay peer's) must not stop. ?run-hidden=0 for one
+    // load.
+    this.runHidden = false;
+    // Cap on guest-thread time per step while the main thread is runnable
+    // (see the run loop). 0 = the default budgets. `liveWorkerCapMs` in
+    // lib/apps.js, ?live-worker-ms=N for one load.
+    this.liveWorkerCapMs = 0;
     // `d3d9FullNpot: true` in lib/apps.js: D3D9 caps report unconditional
     // non-power-of-two textures. ?full-npot=0 for one load.
     this.d3d9FullNpot = false;
     // `d3d9HideDxt: true`: CheckDeviceFormat reports DXT textures unavailable,
     // so D3DX loads them uncompressed. ?hide-dxt=0 for one load.
     this.d3d9HideDxt = false;
+    // `d3d9PS20: true`: CreatePixelShader accepts ps_2_0 (MBAACC's effects).
+    // ?ps20=0 turns it off for one load.
+    this.d3d9PS20 = false;
     // Guest function entries answered natively ($native_hook0..3):
     // `nativeHooks: [{kind, va, module?, ...}]` in lib/apps.js. Kinds:
     // 'vorbis-fill' (lib/native-vorbis-fill.js), 'd3dx-encode-a8r8g8b8'
@@ -1721,6 +1735,9 @@ class WineAssembly {
       const ac = this._audioCtx;
       if (!ac || ac.state !== 'running') { this._audioIdleSince = 0; return; }
       if (this._audioNeedsContext()) { this._audioIdleSince = 0; return; }
+      // A runHidden guest's context is what keeps a hidden page's timers
+      // (and the audio-clock wake) alive; silence must not suspend it.
+      if (this.runHidden) { this._audioIdleSince = 0; return; }
       const now = this._audioSchedulerNow();
       if (!this._audioIdleSince) { this._audioIdleSince = now; return; }
       if (now - this._audioIdleSince < WineAssembly.AUDIO_IDLE_SUSPEND_MS) return;
@@ -1818,7 +1835,23 @@ class WineAssembly {
       // $native_hook_eip: answered against the calling thread's own exports.
       nativeHook: (eip, ex) => {
         const handler = self._nativeHookByEip.get(eip >>> 0);
-        return !!(handler && handler.hook(eip, ex));
+        if (!handler || handler._hookFailed >= 3) return false;
+        // A hook that throws must not take its thread with it: the run loop
+        // reports any exception as a guest crash and retires the thread, and
+        // a game whose loader thread silently vanishes waits on it forever
+        // (MBAACC: "nothing loaded", music stopped). Hooks set eip/esp last,
+        // so declining hands the call back to the guest's own code, which
+        // recomputes whatever the hook may have half-written. Three strikes
+        // and the hook stays off for the session.
+        try {
+          return !!handler.hook(eip, ex);
+        } catch (err) {
+          handler._hookFailed = (handler._hookFailed | 0) + 1;
+          handler._hookLastError = String(err && err.message || err).slice(0, 200);
+          self.logToUI(`[native-hook] 0x${(eip >>> 0).toString(16)} threw (${handler._hookLastError}); declined`
+            + (handler._hookFailed >= 3 ? ', now disabled' : ''));
+          return false;
+        }
       },
       signalSyncHandle: handle => self.threadManager
         ? self.threadManager.setEvent(handle >>> 0) : 0,
@@ -2110,6 +2143,59 @@ class WineAssembly {
       : null;
     let lastTraceApi = false;
     let pendingTraceComApiId = -1;
+    // ?d3d-trace: a quiet ring of every API call (args, caller, return value)
+    // that posts itself to the dev server's /api/perf when a texture copy or
+    // offscreen-surface call happens -- the moment MBAACC builds its pause /
+    // dialogue blur and round-start overlays -- so a capture needs no console
+    // snippet. Nothing goes to the console or the UI log, which is what made
+    // whole-API tracing unplayably slow.
+    const d3dTrace = (typeof location !== 'undefined' && /[?&]d3d-trace(?:[&=]|$)/.test(location.search || '')) ? {
+      ring: [], after: -1, posts: 0, trigger: '', shaders: new Map(), shadersSent: 0,
+      trig: /D3DXCreateEffect|CreatePixelShader|CreateVertexShader|D3DXLoadSurfaceFromSurface|GetRenderTargetData|StretchRect|CreateOffscreenPlainSurface|UpdateSurface|UpdateTexture|GetFrontBufferData|CreateRenderTarget|D3DXCreateTexture\(0x[0-9a-f]+, 0x00000(?:400|280)/,
+      add(line) {
+        this.ring.push(`${performance.now().toFixed(1)} ${line}`);
+        if (this.after < 0) {
+          if (this.ring.length > 3000) this.ring.splice(0, this.ring.length - 3000);
+          if (this.posts < 12 && this.trig.test(line)) { this.after = 4000; this.trigger = line; }
+        } else if (--this.after === 0) this.flush();
+      },
+      sendShaders() {
+        const list = Array.from(this.shaders.values()).slice(this.shadersSent);
+        this.shadersSent = this.shaders.size;
+        if (!list.length) return;
+        try {
+          fetch('/api/perf', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session: 'd3dshaders', at: Date.now(), steps: [], frames: [], shaders: list }) }).catch(() => {});
+        } catch (_) {}
+      },
+      flush() {
+        this.sendShaders();
+        const lines = this.ring, trigger = this.trigger;
+        this.ring = []; this.after = -1; this.posts++;
+        // MBAACC diagnostic (temporary): its effect table, a vector of
+        // {+4 ID3DXEffect*, +8 technique handle, +0xc name} at 0x7b097c..0x7b0980.
+        let effects = null;
+        try {
+          const ex = self.instance && self.instance.exports, r32 = a => ex.guest_read32(a >>> 0) >>> 0;
+          if (ex && ex.guest_read32 && ex.guest_read8 && /mbaa/i.test(String(self._exeName || ""))) {
+            const first = r32(0x7b097c), last = r32(0x7b0980);
+            effects = [];
+            for (let p = first; p && p < last && effects.length < 64; p += 4) {
+              const e = r32(p);
+              if (!e) { effects.push(null); continue; }
+              let name = '';
+              for (let i = 0; i < 48; i++) { const ch = ex.guest_read8(e + 0xc + i) & 255; if (!ch) break; name += String.fromCharCode(ch); }
+              effects.push({ name, effect: r32(e + 4).toString(16), technique: r32(e + 8).toString(16) });
+            }
+          }
+        } catch (err) { effects = String(err && err.message || err); }
+        try {
+          fetch('/api/perf', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session: 'd3dtrace', at: Date.now(), steps: [], frames: [], trigger, effects, lines }) }).catch(() => {});
+        } catch (_) {}
+      },
+    } : null;
+    if (d3dTrace) self._d3dTrace = d3dTrace;
 
     // --- Browser-specific overrides ---
     // `stack` is present when a guest Worker forwarded the call (lib/guest-rpc.js
@@ -2117,19 +2203,20 @@ class WineAssembly {
     // thread at call time. This page's instance runs no guest code then.
     h.log = (ptr, len, ...stack) => {
       let text = '';
-      if (self.verbose || (traceApiNames && traceApiNames.size)) {
+      if (self.verbose || d3dTrace || (traceApiNames && traceApiNames.size)) {
         const view = new Uint8Array(self.memory.buffer, ptr, Math.min(len, 256));
         text = new TextDecoder().decode(new Uint8Array(view));
       }
       lastTraceApi = false;
-      if (traceApiNames && traceApiNames.size) {
+      if (d3dTrace || (traceApiNames && traceApiNames.size)) {
         let apiName = text.replace(/\0.*$/, '');
         if (pendingTraceComApiId >= 0) {
           const resolved = self.apiTable && self.apiTable[pendingTraceComApiId];
           if (resolved && resolved.name) apiName = resolved.name;
           pendingTraceComApiId = -1;
         }
-        if ((traceApiNames && traceApiNames.has(apiName)) || (typeof window !== 'undefined' && window.__waTraceAllApis)) {
+        const loudTrace = (traceApiNames && traceApiNames.has(apiName)) || (typeof window !== 'undefined' && window.__waTraceAllApis);
+        if (loudTrace || d3dTrace) {
           lastTraceApi = true;
           let suffix = '';
           const ex = self.instance && self.instance.exports;
@@ -2173,8 +2260,36 @@ class WineAssembly {
               suffix += ` clsid.d1=0x${(ex.guest_read32(raw[0]) >>> 0).toString(16).padStart(8, '0')}`;
             }
           }
-          console.log(`[API] ${apiName}${suffix}`);
-          self.logToUI(`[API] ${apiName}${suffix}`);
+          if (d3dTrace) {
+            d3dTrace.add(`[API] ${apiName}${suffix}`);
+            // Keep each distinct shader's bytecode (tokens up to END) so the
+            // translator can be tested offline against the guest's real shaders.
+            if (/Device9_Create(Pixel|Vertex)Shader$/.test(apiName) && ex && ex.guest_read32) {
+              try {
+                const esp0 = ex.get_esp() >>> 0, code = ex.guest_read32((esp0 + 8) >>> 0) >>> 0;
+                // Walk tokens by length: comment blocks and DEF literals can
+                // hold the END value as data. SM1 has no length field.
+                const words = [];
+                const read = i => ex.guest_read32((code + i * 4) >>> 0) >>> 0;
+                const sm2 = code && ((read(0) >>> 8) & 0xff) >= 2;
+                for (let i = 0; i < 8192 && code;) {
+                  const w = read(i);
+                  words.push(w); i++;
+                  if (w === 0x0000ffff) break;
+                  if (i === 1) continue;
+                  const n = (w & 0xffff) === 0xfffe ? (w >>> 16) & 0x7fff : (sm2 ? (w >>> 24) & 15 : 0);
+                  for (let k = 0; k < n && i < 8192; k++, i++) words.push(read(i));
+                }
+                const key = words.join(',');
+                if (!d3dTrace.shaders.has(key)) d3dTrace.shaders.set(key, words);
+                if (d3dTrace.shaders.size > d3dTrace.shadersSent && d3dTrace.shaders.size % 16 === 0) d3dTrace.sendShaders();
+              } catch (_) {}
+            }
+          }
+          if (loudTrace) {
+            console.log(`[API] ${apiName}${suffix}`);
+            self.logToUI(`[API] ${apiName}${suffix}`);
+          }
         }
       }
       if (self.verbose) {
@@ -2231,7 +2346,10 @@ class WineAssembly {
         }
         return;
       }
-      if (lastTraceApi) console.log(`  => 0x${u.toString(16)}`);
+      if (lastTraceApi) {
+        if (d3dTrace) d3dTrace.add(`  => 0x${u.toString(16)}`);
+        if (!d3dTrace || (typeof window !== 'undefined' && window.__waTraceAllApis)) console.log(`  => 0x${u.toString(16)}`);
+      }
       if (self.verbose) {
         console.log('[wine-asm] i32:', '0x' + u.toString(16));
         self.logToUI('[wine-asm] i32: 0x' + u.toString(16));
@@ -3024,15 +3142,19 @@ class WineAssembly {
     try {
       const q = new URLSearchParams(location.search);
       if (q.has('fine-qpc')) this.fineQpc = q.get('fine-qpc') !== '0';
+      if (q.has('run-hidden')) this.runHidden = q.get('run-hidden') !== '0';
+      if (q.has('live-worker-ms')) this.liveWorkerCapMs = Math.max(0, Number(q.get('live-worker-ms')) || 0);
     } catch (_) {}
     if (this.instance.exports.set_qpc_fine) this.instance.exports.set_qpc_fine(this.fineQpc ? 1 : 0);
     try {
       const q = new URLSearchParams(location.search);
       if (q.has('full-npot')) this.d3d9FullNpot = q.get('full-npot') !== '0';
       if (q.has('hide-dxt')) this.d3d9HideDxt = q.get('hide-dxt') !== '0';
+      if (q.has('ps20')) this.d3d9PS20 = q.get('ps20') !== '0';
     } catch (_) {}
     if (this.instance.exports.set_d3d9_full_npot) this.instance.exports.set_d3d9_full_npot(this.d3d9FullNpot ? 1 : 0);
     if (this.instance.exports.set_d3d9_hide_dxt) this.instance.exports.set_d3d9_hide_dxt(this.d3d9HideDxt ? 1 : 0);
+    if (this.instance.exports.set_d3d9_ps20) this.instance.exports.set_d3d9_ps20(this.d3d9PS20 ? 1 : 0);
     // The micro-op tier (07d/07e). Not decode-time: a hot head is compiled on
     // its 256th entry whenever the tier is on, and turning it off flushes every
     // program, so setUop() below can flip it on a running app too.
@@ -3116,6 +3238,9 @@ class WineAssembly {
       }
       if (this.instance.exports.set_d3d9_hide_dxt) {
         await this.guestWorker.callExport('set_d3d9_hide_dxt', this.d3d9HideDxt ? 1 : 0);
+      }
+      if (this.instance.exports.set_d3d9_ps20) {
+        await this.guestWorker.callExport('set_d3d9_ps20', this.d3d9PS20 ? 1 : 0);
       }
       if (this.nullPageFaults && this.instance.exports.set_fault_unmapped) {
         await this.guestWorker.callExport('set_fault_unmapped', 4);
@@ -3279,6 +3404,7 @@ class WineAssembly {
     this.threadManager.recordInheritedWasmGlobal('set_qpc_fine', this.fineQpc ? 1 : 0);
     this.threadManager.recordInheritedWasmGlobal('set_d3d9_full_npot', this.d3d9FullNpot ? 1 : 0);
     this.threadManager.recordInheritedWasmGlobal('set_d3d9_hide_dxt', this.d3d9HideDxt ? 1 : 0);
+    this.threadManager.recordInheritedWasmGlobal('set_d3d9_ps20', this.d3d9PS20 ? 1 : 0);
     this.threadManager.recordInheritedWasmGlobal('set_present_cap', presentCap);
     this.threadManager.recordInheritedWasmGlobal('set_present_pace_mode',
       this.presentPace === 'deadline' ? 0 : 1);
@@ -4612,7 +4738,8 @@ class WineAssembly {
       'mbaa-palette': 'native-palette', 'png-unfilter': 'native-png', 'd3dx-dxt5-memo': 'native-dxt5',
       'd3dx-dxt5-encode': 'native-dxt5', 'd3dx-dxt-color-decode': 'native-dxt-decode',
       'd3dx-dxt3-decode': 'native-dxt-decode', 'd3dx-dxt5-decode': 'native-dxt-decode',
-      'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate' };
+      'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate',
+      'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4628,11 +4755,23 @@ class WineAssembly {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
       'd3dx-argb-decode': cfg => typeof NativeArgbDecode === 'function' && new NativeArgbDecode(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
+      'mbaa-limiter-sleep': cfg => typeof NativeMbaaLimiter === 'function' && new NativeMbaaLimiter(cfg),
+      'mbaa-spin-limiter': cfg => typeof NativeMbaaSpinLimiter === 'function' && new NativeMbaaSpinLimiter(cfg),
+      'd3dx-matrix-multiply': cfg => typeof NativeD3dxMatrix === 'function' && new NativeD3dxMatrix(cfg, {
+        getBuffer: () => this.memory.buffer }),
       'zlib-inflate': cfg => typeof NativeInflate === 'function' && new NativeInflate(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
     };
     let slot = 0;
     for (const cfg of this.nativeHooks) {
+      // Answered inside the interpreter, no host call and no slot.
+      if (cfg && cfg.kind === 'msvc-ftol2') {
+        if ((q && q.get('native-ftol') === '0') || !ex.set_native_ftol) continue;
+        ex.set_native_ftol(cfg.va >>> 0);
+        if (this.threadManager) this.threadManager.recordInheritedWasmGlobal('set_native_ftol', cfg.va >>> 0);
+        this.logToUI(`[native-hook] msvc-ftol2 at 0x${(cfg.va >>> 0).toString(16)} (WAT)`);
+        continue;
+      }
       if (slot > 15 || !cfg || !(make[cfg.kind] || /^d3dx-dxt(-color|3|5)-decode$/.test(cfg.kind))) continue;
       if (q && q.get(off[cfg.kind]) === '0') continue;
       let eip = cfg.va >>> 0;
@@ -5990,7 +6129,7 @@ class WineAssembly {
     const delay = delayMs > 0 ? Math.min(delayMs, WineAssembly.MAX_PARK_SLEEP_MS) : 0;
     if (delay > 0) {
       this._delayedStep = step;
-      this._stepTimeoutId = setTimeout(() => {
+      this._stepTimeoutId = this._setStepTimer(() => {
         this._stepTimeoutId = 0;
         const fn = this._delayedStep;
         this._delayedStep = null;
@@ -6040,10 +6179,43 @@ class WineAssembly {
 
   _cancelDelayedStep() {
     if (this._stepTimeoutId) {
-      clearTimeout(this._stepTimeoutId);
+      this._clearStepTimer(this._stepTimeoutId);
       this._stepTimeoutId = 0;
     }
     this._delayedStep = null;
+  }
+
+  // A parked sleep's timer. On a hidden page a runHidden guest uses the
+  // worker-backed wake timer: the page's own timers are clamped to ~1Hz
+  // there, which turned every Sleep(8) of a frame limiter into a second.
+  _setStepTimer(fn, delay) {
+    const wake = this.runHidden && typeof WaWakeTimer !== 'undefined' && WaWakeTimer.hidden()
+      ? WaWakeTimer : null;
+    this._stepTimerWake = !!wake;
+    if (wake) this._ensureHiddenClock();
+    return wake ? wake.set(fn, delay) : setTimeout(fn, delay);
+  }
+
+  // Measured on Chrome/macOS: a hidden renderer with no running AudioContext
+  // has every timer coalesced to ~80-180ms -- a worker's and Atomics.wait
+  // too -- and a running context restores ~9ms. So a runHidden guest gets
+  // one even before its first sound (a page that was launched by a click
+  // has the sticky activation resume() needs), and the wake timer also
+  // ticks from its audio clock.
+  _ensureHiddenClock() {
+    if (!this.runHidden) return;
+    if (!this._audioCtx || this._audioCtx.state === 'closed') {
+      this.markAudioRequested();
+      this.primeAudio();
+    } else if (this._audioCtx.state === 'suspended') {
+      this.wakeAudio();
+    }
+    if (this._audioCtx && typeof WaWakeTimer !== 'undefined') WaWakeTimer.attachAudio(this._audioCtx);
+  }
+
+  _clearStepTimer(id) {
+    if (this._stepTimerWake) WaWakeTimer.clear(id); else clearTimeout(id);
+    this._stepTimerWake = false;
   }
 
   // ---- frozen (agent-stepped) mode ------------------------------------
@@ -6240,7 +6412,7 @@ class WineAssembly {
     if (!this.running) return;
     if (this._hiddenPaused) { this._resumeFromHidden(); return; }
     if (!this._stepTimeoutId) return;
-    clearTimeout(this._stepTimeoutId);
+    this._clearStepTimer(this._stepTimeoutId);
     this._stepTimeoutId = 0;
     const fn = this._delayedStep;
     this._delayedStep = null;
@@ -6552,10 +6724,19 @@ class WineAssembly {
     let best = threadDelay;
     // Sleep deadlines are recorded on ThreadManager's guest wait clock;
     // recent input above is timestamped on the host profiling clock.
+    let mainLeft = Infinity;
     if (tm && tm._mainSleepUntil) {
       const waitNow = tm._waitNow ? tm._waitNow() : now;
-      best = Math.min(best, tm._mainSleepUntil - waitNow);
+      mainLeft = tm._mainSleepUntil - waitNow;
+      best = Math.min(best, mainLeft);
     }
+    // The last stretch of a main-thread Sleep: a timer park wakes ~1ms late,
+    // and frame limiters that rebase on every frame (MBAACC's 0x41fd60 Sleeps
+    // 2ms at a time, then restarts its period from "now") turn each late wake
+    // into a longer frame -- 0.35ms average ran it at 58.8fps. Under 1.5ms,
+    // keep stepping through the unclamped MessageChannel hop (~0.1ms) so the
+    // wake lands on the deadline. Costs at most ~1.5ms of polling per sleep.
+    if (spin <= 0 && mainLeft > 0 && mainLeft < 1.5 && best === mainLeft) return 0;
     let yr = 0;
     try { yr = ex.get_yield_reason ? (ex.get_yield_reason() >>> 0) : 0; } catch (_) { return 0; }
     if (yr === 1) {
@@ -6609,13 +6790,29 @@ class WineAssembly {
     this._visibilityHooked = true;
     this._onVisibilityChange = () => {
       if (!this.running) return;
-      if (document.hidden) this._maybePauseForHidden();
-      else this._resumeFromHidden();
+      if (document.hidden) {
+        // A sleep armed on a page timer just before hiding would be clamped
+        // to ~1s; cut it short so the next one is armed on the wake timer.
+        if (this.runHidden) { this._holdKeepAliveLock(); this._ensureHiddenClock(); this._wakeStep(); }
+        this._maybePauseForHidden();
+      } else this._resumeFromHidden();
     };
     document.addEventListener('visibilitychange', this._onVisibilityChange);
+    if (this.runHidden) this._holdKeepAliveLock();
+  }
+
+  // Chrome may freeze a hidden tab outright (Energy Saver, memory pressure)
+  // regardless of timers; a page holding a Web Lock is exempt. Held until
+  // the host stops.
+  _holdKeepAliveLock() {
+    if (this._keepAliveRelease || typeof navigator === 'undefined' || !navigator.locks) return;
+    const held = new Promise(resolve => { this._keepAliveRelease = resolve; });
+    navigator.locks.request('wine-assembly-run-hidden-' + Math.random().toString(36).slice(2),
+      () => held).catch(() => {});
   }
 
   _removeVisibilityPause() {
+    if (this._keepAliveRelease) { this._keepAliveRelease(); this._keepAliveRelease = null; }
     if (!this._visibilityHooked || typeof document === 'undefined') return;
     this._visibilityHooked = false;
     if (this._onVisibilityChange) {
@@ -6631,6 +6828,7 @@ class WineAssembly {
     if (this._frozen || (typeof window !== 'undefined' && (window.__waNeverPauseHidden || window.agentRemoteSessionId))) return false;
     if (this._hiddenPaused || !this.running) return false;
     if (typeof document === 'undefined' || !document.hidden) return false;
+    if (this.runHidden) return false;
     if (this._isAudioHot()) return false;
     // A networked guest has a peer whose clock never stopped. Pausing it
     // freezes the match on BOTH screens -- the peer is waiting on records
@@ -7108,18 +7306,54 @@ class WineAssembly {
                 // 4ms audio-hot cap only idles the page while the thread it
                 // waits on (MBAA's sprite loader in character select) trickles.
                 // Audio threads still go first (prioritizeAudioThreads).
-                const maxWallMs = audioHot
+                let maxWallMs = audioHot
                   ? (menuOpen ? (mainThreadWaiting ? 8 : 6) : (mainThreadWaiting ? 10 : 4))
                   // While input is arriving, workers get a short quantum so
                   // the pointer still feels attached to the cursor — but a
                   // short one, not none.
                   : (recentInputWake ? 6 : (mainThreadWaiting ? 16 : 12));
+                // `liveWorkerCapMs` (lib/apps.js): while the main thread still
+                // has frame work, worker time comes straight out of that frame.
+                // MBAACC's portrait/loader threads took ~400ms a second this
+                // way while scrolling the character select (main got ~100ms,
+                // 35-43fps). Parked steps -- the limiter's sleep, or a wait on
+                // the loader itself -- keep their full budget, so loads still
+                // get every idle millisecond.
+                let quantum = quantumSteps;
+                // Audio threads run first and keep their own per-step
+                // allowance on top of the cap: capping the music thread to
+                // 1ms delayed the start of every song (its first fills decode
+                // in the guest until the browser's decode lands).
+                const tmc = self.threadManager;
+                const liveCap = self.liveWorkerCapMs + ((tmc && tmc._hasHotAudioThreads && tmc._hasHotAudioThreads())
+                  ? Math.max(0, tmc.audioThreadStepMs || 0) : 0);
+                if (!mainThreadWaiting && self.liveWorkerCapMs > 0 && maxWallMs > liveCap) {
+                  maxWallMs = liveCap;
+                  // The wall clock is only checked between quanta, and a
+                  // 10,000-block quantum alone ran ~2.75ms (measured: 478ms
+                  // over 174 one-millisecond caps). Small quanta make the cap
+                  // a cap.
+                  quantum = Math.min(quantum, 1500);
+                }
+                // A main thread in a timed Sleep (a frame limiter waiting for
+                // its next frame) must wake on time: worker time may not run
+                // past that deadline, or the frame is lost. MBAACC's sprite
+                // loader running 4-10ms slices against a 2ms-away frame was
+                // the character-select drop. Untimed waits (on the loader
+                // itself) keep the full budget.
+                {
+                  const tmx = self.threadManager;
+                  if (tmx && tmx._mainSleepUntil) {
+                    const left = tmx._mainSleepUntil - (tmx._waitNow ? tmx._waitNow() : 0);
+                    if (left > 0 && left < maxWallMs) maxWallMs = Math.max(0.25, left - 0.25);
+                  }
+                }
                 const threadStats = self.threadManager.runBudgeted({
                   // Non-audio UI workers should be limited by the wall-clock
                   // budget, not by one nominal interpreter slice. Credits
                   // needs several quanta before it can present its first frame.
                   maxTotalSteps: audioHot && !mainThreadWaiting ? threadBudget : threadBudget * 4,
-                  quantumSteps,
+                  quantumSteps: quantum,
                   maxWallMs,
                   prioritizeAudioThreads: audioHot && !menuOpen,
                   exemptTimedSleepers: self._schedArm('a'),

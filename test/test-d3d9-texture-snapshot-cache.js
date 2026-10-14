@@ -236,5 +236,27 @@ const drawnPixels = command => drawnLevel(command).pixels;
     await f.bridge.close();
   }
 
+  // ---- A new texture at a reused record, unlike only where unsampled -----
+  {
+    // MBAACC's arcade dialogue lines and stage portraits are mostly
+    // transparent: two different images agree at every sampled chunk, and the
+    // sample alone served the previous line / screen. The texture identity
+    // stamped at creation (+60, $d3d9_texture_create_kind) must decide it.
+    const f = fixture({}, 256, 256);
+    new Uint8Array(f.memory, f.texels, f.bytes).fill(0);
+    f.initialized.resolve(); await tick();
+    f.set(40000 + 60, 7); f.set(f.program + 25596, 7);
+    f.bridge.call(0x30001, f.desc, 0); await f.flush();
+    const kept = f.bridge._textureSnapshots.get(f.mip).pixels;
+    // New texture (identity and generation 8) at the same record: same bytes
+    // everywhere sampled, different text in an unsampled gap.
+    f.set(40000 + 60, 8); f.set(f.program + 25596, 8);
+    new Uint8Array(f.memory, f.texels + 1000, 64).fill(0x7f);
+    f.bridge.call(0x30001, f.desc, 0); await f.flush();
+    assert.notStrictEqual(f.bridge._textureSnapshots.get(f.mip).pixels, kept,
+      'a new texture identity re-decodes even when every sampled chunk matches');
+    await f.bridge.close();
+  }
+
   console.log('PASS test-d3d9-texture-snapshot-cache');
 })().catch(error => { console.error(error); process.exit(1); });

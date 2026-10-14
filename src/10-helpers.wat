@@ -1651,8 +1651,8 @@
   (func $heap_arena_register (param $base i32) (param $end i32) (result i32)
     (local $count i32) (local $rec i32) (local $i i32)
     (local.set $count (i32.atomic.load (global.get $HEAP_ARENAS)))
-    (if (i32.gt_u (local.get $count) (i32.const 1024))
-      (then (local.set $count (i32.const 1024))))
+    (if (i32.gt_u (local.get $count) (global.get $HEAP_ARENA_MAX))
+      (then (local.set $count (global.get $HEAP_ARENA_MAX))))
     (block $reused (loop $slot
       (br_if $reused (i32.ge_u (local.get $i) (local.get $count)))
       (local.set $rec (i32.add (global.get $HEAP_ARENAS)
@@ -1670,7 +1670,7 @@
       (br $slot)))
     (block $claimed (loop $retry
       (local.set $count (i32.atomic.load (global.get $HEAP_ARENAS)))
-      (if (i32.ge_u (local.get $count) (i32.const 1024))
+      (if (i32.ge_u (local.get $count) (global.get $HEAP_ARENA_MAX))
         (then (return (i32.const 0))))
       (br_if $claimed (i32.eq (local.get $count)
         (i32.atomic.rmw.cmpxchg (global.get $HEAP_ARENAS) (local.get $count)
@@ -1745,7 +1745,7 @@
               (i32.lt_u (local.get $block) (i32.atomic.load offset=8 (local.get $rec)))))
         (then (return (local.get $rec))))))
     (local.set $count (i32.atomic.load (global.get $HEAP_ARENAS)))
-    (if (i32.gt_u (local.get $count) (i32.const 1024))
+    (if (i32.gt_u (local.get $count) (global.get $HEAP_ARENA_MAX))
       (then (return (i32.const 0))))
     (block $done (loop $scan
       (br_if $done (i32.ge_u (local.get $i) (local.get $count)))
@@ -1804,8 +1804,9 @@
       (local.set $cur (local.get $next))
       (br $walk)))
     ;; The large list names whole arenas; drop the one being released too.
+    (call $lock_acquire (global.get $LOCK_HEAP_LARGE))
     (local.set $prev_w (i32.const 0)) (local.set $steps (i32.const 0))
-    (local.set $cur (global.get $heap_large_free))
+    (local.set $cur (call $heap_large_head))
     (block $large_done (loop $large_walk
       (br_if $large_done (i32.eqz (local.get $cur)))
       (local.set $steps (i32.add (local.get $steps) (i32.const 1)))
@@ -1814,7 +1815,7 @@
         (then
           (if (local.get $prev_w)
             (then (i32.store offset=4 (local.get $prev_w) (i32.const 0)))
-            (else (global.set $heap_large_free (i32.const 0))))
+            (else (call $heap_large_set (i32.const 0))))
           (br $large_done)))
       (local.set $next (i32.load offset=4 (call $g2w (local.get $cur))))
       (if (i32.and (i32.ge_u (local.get $cur) (local.get $base))
@@ -1822,10 +1823,11 @@
         (then
           (if (local.get $prev_w)
             (then (i32.store offset=4 (local.get $prev_w) (local.get $next)))
-            (else (global.set $heap_large_free (local.get $next)))))
+            (else (call $heap_large_set (local.get $next)))))
         (else (local.set $prev_w (call $g2w (local.get $cur)))))
       (local.set $cur (local.get $next))
-      (br $large_walk))))
+      (br $large_walk)))
+    (call $lock_release (global.get $LOCK_HEAP_LARGE)))
 
   ;; Give back every retired sparse arena nothing is living in.
   ;;
@@ -1850,7 +1852,7 @@
     (local $count i32) (local $i i32) (local $rec i32) (local $base i32)
     (local $end i32) (local $freed i32)
     (local.set $count (i32.atomic.load (global.get $HEAP_ARENAS)))
-    (if (i32.gt_u (local.get $count) (i32.const 1024))
+    (if (i32.gt_u (local.get $count) (global.get $HEAP_ARENA_MAX))
       (then (return (i32.const 0))))
     (block $done (loop $scan
       (br_if $done (i32.ge_u (local.get $i) (local.get $count)))
@@ -2208,7 +2210,7 @@
 
   ;; A block of $HEAP_LARGE bytes or more gets a sparse arena of its own, the
   ;; way the Windows heap hands a large request straight to VirtualAlloc. When
-  ;; it is freed, $heap_free_impl puts it on $heap_large_free, which only this
+  ;; it is freed, $heap_free_impl puts it on the shared large list, which only this
   ;; function reads; $heap_arena_release_free hands it back under pressure.
   ;;
   ;; Without this a large scratch block was one ordinary free-list entry once
@@ -2224,10 +2226,51 @@
   ;; Returns the block header's guest address, or 0 to fall back to the normal
   ;; path.
   (global $HEAP_LARGE i32 (i32.const 0x00100000))
-  ;; Freed large blocks, linked through +4 like $free_list. Per instance, and
-  ;; read only here, so a small request can never carve one up.
-  (global $heap_large_free (mut i32) (i32.const 0))
+  ;; Freed large blocks, linked through +4 like $free_list, read only by
+  ;; $heap_large_alloc so a small request can never carve one up.
+  ;;
+  ;; PROCESS-WIDE, under $LOCK_HEAP_LARGE. It used to be a per-instance global,
+  ;; so a block was reusable only by the guest thread that freed it. MBAACC
+  ;; creates its textures on loader threads and frees them on the main thread:
+  ;; every load reserved fresh address space and a fresh arena record while
+  ;; the freed blocks piled up on main's list, until the 1024-record table or
+  ;; the address space ran out -- assets stopped loading, then operator new
+  ;; threw std::bad_alloc and the game died.
+  (func $heap_large_head (result i32)
+    (i32.atomic.load (global.get $HEAP_LARGE_FREE_SHARED)))
+  (func $heap_large_set (param $v i32)
+    (i32.atomic.store (global.get $HEAP_LARGE_FREE_SHARED) (local.get $v)))
+
+  ;; Link a freed whole-arena block onto the shared list. 0 if it is already
+  ;; on it (a double free), so the caller reports the free as failed.
+  (func $heap_large_push (param $block i32) (result i32)
+    (local $cur i32) (local $steps i32)
+    (call $lock_acquire (global.get $LOCK_HEAP_LARGE))
+    (local.set $cur (call $heap_large_head))
+    (block $checked (loop $scan
+      (br_if $checked (i32.eqz (local.get $cur)))
+      (br_if $checked (i32.gt_u (local.get $steps) (i32.const 64)))
+      (if (i32.eq (local.get $cur) (local.get $block))
+        (then
+          (call $lock_release (global.get $LOCK_HEAP_LARGE))
+          (return (i32.const 0))))
+      (if (i32.eqz (call $heap_arena_find (local.get $cur))) (then (br $checked)))
+      (local.set $cur (i32.load offset=4 (call $g2w (local.get $cur))))
+      (local.set $steps (i32.add (local.get $steps) (i32.const 1)))
+      (br $scan)))
+    (i32.store offset=4 (call $g2w (local.get $block)) (call $heap_large_head))
+    (call $heap_large_set (local.get $block))
+    (call $lock_release (global.get $LOCK_HEAP_LARGE))
+    (i32.const 1))
+
   (func $heap_large_alloc (param $need i32) (result i32)
+    (local $r i32)
+    (call $lock_acquire (global.get $LOCK_HEAP_LARGE))
+    (local.set $r (call $heap_large_alloc_locked (local.get $need)))
+    (call $lock_release (global.get $LOCK_HEAP_LARGE))
+    (local.get $r))
+
+  (func $heap_large_alloc_locked (param $need i32) (result i32)
     (local $chunk i32) (local $base i32) (local $record i32)
     (local $cur i32) (local $prev_w i32) (local $size i32) (local $steps i32)
     (local $best i32) (local $best_size i32) (local $best_prev_w i32)
@@ -2238,7 +2281,7 @@
     ;; Best fit among freed large blocks, wasting at most half the request: a
     ;; 48 MB scratch buffer freed and asked for again gets the same arena back,
     ;; with the same address space and backing.
-    (local.set $cur (global.get $heap_large_free))
+    (local.set $cur (call $heap_large_head))
     (block $scanned (loop $scan
       (br_if $scanned (i32.eqz (local.get $cur)))
       (br_if $scanned (i32.gt_u (local.get $steps) (i32.const 1024)))
@@ -2248,7 +2291,7 @@
         (then
           (if (local.get $prev_w)
             (then (i32.store offset=4 (local.get $prev_w) (i32.const 0)))
-            (else (global.set $heap_large_free (i32.const 0))))
+            (else (call $heap_large_set (i32.const 0))))
           (br $scanned)))
       (local.set $size (i32.load (call $g2w (local.get $cur))))
       (if (i32.ge_u (local.get $size) (local.get $chunk))
@@ -2276,7 +2319,7 @@
         (if (local.get $best_prev_w)
           (then (i32.store offset=4 (local.get $best_prev_w)
             (i32.load offset=4 (call $g2w (local.get $best)))))
-          (else (global.set $heap_large_free
+          (else (call $heap_large_set
             (i32.load offset=4 (call $g2w (local.get $best))))))
         (call $heap_arena_charge (call $heap_arena_find (local.get $best)) (local.get $best_size))
         ;; Fresh pages, as a Windows VirtualAlloc-backed block would be.
@@ -2295,7 +2338,7 @@
             (if (local.get $any_fit_prev_w)
               (then (i32.store offset=4 (local.get $any_fit_prev_w)
                 (i32.load offset=4 (call $g2w (local.get $any_fit)))))
-              (else (global.set $heap_large_free
+              (else (call $heap_large_set
                 (i32.load offset=4 (call $g2w (local.get $any_fit))))))
             (call $heap_arena_charge (call $heap_arena_find (local.get $any_fit)) (local.get $any_fit_size))
             (call $guest_memset (i32.add (local.get $any_fit) (i32.const 4)) (i32.const 0)
@@ -2312,7 +2355,7 @@
                 (if (local.get $any_fit_prev_w)
                   (then (i32.store offset=4 (local.get $any_fit_prev_w)
                     (i32.load offset=4 (call $g2w (local.get $any_fit)))))
-                  (else (global.set $heap_large_free
+                  (else (call $heap_large_set
                     (i32.load offset=4 (call $g2w (local.get $any_fit))))))
                 (call $heap_arena_charge (call $heap_arena_find (local.get $any_fit)) (local.get $any_fit_size))
                 (call $guest_memset (i32.add (local.get $any_fit) (i32.const 4)) (i32.const 0)
@@ -2321,8 +2364,18 @@
             (return (i32.const 0))))))
     (local.set $record (call $heap_arena_register
       (local.get $base) (i32.add (local.get $base) (local.get $chunk))))
+    ;; A full record table is pressure like any other: hand back the arenas
+    ;; nothing lives in and ask again before failing the allocation.
     (if (i32.eqz (local.get $record))
-      (then (drop (call $virtual_map_release (local.get $base))) (return (i32.const 0))))
+      (then
+        (if (call $heap_arena_release_free)
+          (then (local.set $record (call $heap_arena_register
+            (local.get $base) (i32.add (local.get $base) (local.get $chunk))))))))
+    (if (i32.eqz (local.get $record))
+      (then
+        (drop (call $virtual_map_release (local.get $base)))
+        (call $host_heap_oom_trace (local.get $chunk) (i32.const 4))
+        (return (i32.const 0))))
     ;; One block spans the whole arena; its header records the arena's size.
     (i32.store (call $g2w (local.get $base)) (local.get $chunk))
     (call $heap_arena_charge (local.get $record) (local.get $chunk))
@@ -2378,6 +2431,11 @@
                 (return (i32.const 0))))))
         (local.set $record (call $heap_arena_register
           (local.get $new_top) (i32.add (local.get $new_top) (local.get $chunk))))
+        (if (i32.eqz (local.get $record))
+          (then
+            (if (call $heap_arena_release_free)
+              (then (local.set $record (call $heap_arena_register
+                (local.get $new_top) (i32.add (local.get $new_top) (local.get $chunk))))))))
         (if (i32.eqz (local.get $record))
           (then
             (drop (call $virtual_map_release (local.get $new_top)))
@@ -2980,18 +3038,8 @@
             (i32.eq (i32.load offset=4 (local.get $rec))
               (i32.add (local.get $block) (local.get $size)))))
       (then
-        (local.set $cur (global.get $heap_large_free))
-        (block $large_checked (loop $large_scan
-          (br_if $large_checked (i32.eqz (local.get $cur)))
-          (br_if $large_checked (i32.gt_u (local.get $steps) (i32.const 64)))
-          (if (i32.eq (local.get $cur) (local.get $block))
-            (then (return (i32.const 0))))
-          (if (i32.eqz (call $heap_arena_find (local.get $cur))) (then (br $large_checked)))
-          (local.set $cur (i32.load offset=4 (call $g2w (local.get $cur))))
-          (local.set $steps (i32.add (local.get $steps) (i32.const 1)))
-          (br $large_scan)))
-        (i32.store offset=4 (local.get $w) (global.get $heap_large_free))
-        (global.set $heap_large_free (local.get $block))
+        (if (i32.eqz (call $heap_large_push (local.get $block)))
+          (then (return (i32.const 0))))
         (global.set $heap_stat_frees (i32.add (global.get $heap_stat_frees) (i32.const 1)))
         (call $heap_arena_charge (local.get $rec) (i32.sub (i32.const 0) (local.get $size)))
         (return (i32.const 1))))

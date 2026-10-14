@@ -634,7 +634,9 @@ const sigs=require('../lib/host-import-sigs.generated.json').sigs;
           data.setFloat32(p+8,.5,true);data.setFloat32(p+12,1,true);data.setUint32(p+16,0xffffffff,true);
           data.setFloat32(p+20,.25,true);data.setFloat32(p+24,.25,true);
         });
-        bad(await invoke(e.Device9_DrawPrimitiveUP,ad,4,1,tri,32));
+        // Sampling the bound target is legal D3D9 (MBAACC's blur composites
+        // rely on it): the executor reads a snapshot taken before the draw.
+        ok(await invoke(e.Device9_DrawPrimitiveUP,ad,4,1,tri,32),'sample the bound target');
         ok(e.Device9_SetRenderTarget(ad,0,ab),'sample into backbuffer');
         ok(await invoke(e.Device9_DrawPrimitiveUP,ad,4,1,tri,32),'sample rendered texture through native draw');
         ok(await invoke(e.Device9_Present,ad),'present sampled result');

@@ -234,6 +234,9 @@ const highFixedAliases = new Map(Object.entries({
   // LOCK-prefix atomic mode (+32) and its split-lock mutex (+36).
   LOCK_MODE: { owner: 'SHARED_COUNTERS' },
   LOCK_MUTEX: { owner: 'SHARED_COUNTERS' },
+  // The process-wide large-block free list: its lock (+48) and head (+56).
+  LOCK_HEAP_LARGE: { owner: 'SHARED_COUNTERS' },
+  HEAP_LARGE_FREE_SHARED: { owner: 'SHARED_COUNTERS' },
 }));
 
 const regionByName = new Map(regions.map(region => [region.name, region]));
