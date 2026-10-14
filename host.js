@@ -4757,7 +4757,7 @@ class WineAssembly {
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
       'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route',
       'mbaa-sfx-filter': 'sfx-filter', 'mbaa-frame-stage': 'rollback-test',
-      'mbaa-gfx-skip': 'native-gfx-skip', 'mbaa-move-skip': 'native-move-skip', 'mbaa-menu-block': 'menu-block' };
+      'mbaa-gfx-skip': 'native-gfx-skip', 'mbaa-move-skip': 'native-move-skip', 'mbaa-menu-block': 'menu-block', 'mbaa-lookup-skip': 'native-lookup-skip', 'mbaa-pcm16': 'native-pcm16' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4798,6 +4798,9 @@ class WineAssembly {
       'mbaa-gfx-skip': cfg => typeof NativeMbaaGfxSkip === 'function' && new NativeMbaaGfxSkip(cfg, {
         getBuffer: () => this.memory.buffer }),
       'mbaa-move-skip': cfg => typeof NativeMbaaMoveSkip === 'function' && new NativeMbaaMoveSkip(cfg),
+      'mbaa-pcm16': cfg => typeof NativeMbaaPcm16 === 'function' && new NativeMbaaPcm16(cfg, { getBuffer: () => this.memory.buffer }),
+      'mbaa-lookup-skip': cfg => typeof NativeMbaaLookupSkip === 'function' && new NativeMbaaLookupSkip(cfg, {
+        getBuffer: () => this.memory.buffer }),
       'mbaa-menu-block': cfg => {
         const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
         if (typeof MbaaMenuBlock !== 'function' || !(embed && (embed.mode || embed.netplay))) return null;
