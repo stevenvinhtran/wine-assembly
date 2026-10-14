@@ -4779,6 +4779,7 @@ class WineAssembly {
         if (!selfTest && !bridge) return null;
         return new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg),
           selfTest, window: Number(q && q.get('rollback-window')) || 8, route: this._mbaaRoute || null,
+          guestMs: () => this._guestMainMs || 0, hostSteps: () => this._stepTicks | 0,
           inputSource: bridge ? frame => (typeof window.__waInputSource === 'function' ? window.__waInputSource(frame) : null) : null });
       },
       'd3dx-matrix-multiply': cfg => typeof NativeD3dxMatrix === 'function' && new NativeD3dxMatrix(cfg, {
@@ -7094,7 +7095,12 @@ class WineAssembly {
           const pageProfile = (typeof window !== 'undefined' && window.__aoeProfile) || null;
           const pageProfileStart = pageProfile && typeof performance !== 'undefined' ? performance.now() : 0;
           const perfMainStart = perf ? performance.now() : 0;
+          // Cumulative main-thread guest time, always kept (two clock reads a
+          // slice): the rollback self-test splits re-simulation cost into
+          // guest execution and everything around it.
+          const guestStart = typeof performance !== 'undefined' ? performance.now() : 0;
           const mainStats = self._runCooperativeSlice(activeStepsPerSlice);
+          if (guestStart) self._guestMainMs = (self._guestMainMs || 0) + (performance.now() - guestStart);
           if (perf) {
             perf.countBlocks(mainStats.blocks);
             perf.markThrottled(mainStats.hitDeadline);
