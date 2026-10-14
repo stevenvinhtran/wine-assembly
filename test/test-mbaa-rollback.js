@@ -182,4 +182,18 @@ assert(rb.stats.skipped > skipped, 'they skip it');
   assert.deepStrictEqual(flags(), [], '7 played at frame 10 originally: not again one frame later');
 }
 
+// Cross-machine hash: pointer fields excluded, value fields included.
+{
+  const st = new Uint8Array(MbaaRollback.STATE_BYTES);
+  for (let i = 0; i < st.length; i++) st[i] = (i * 7) & 255;
+  const at = addr => { let o = 0; for (const [s, e] of MbaaRollback.RANGES) { if (addr >= s && addr < e) return o + addr - s; o += e - s; } return -1; };
+  const h0 = MbaaRollback.valueHash(st);
+  const ptr = st.slice(); ptr[at(0x55544C)] ^= 0xff; ptr[at(0x55544C + 0xAFC)] ^= 0xff; ptr[at(0x61E170 + 8)] ^= 1;
+  assert.strictEqual(MbaaRollback.valueHash(ptr), h0, 'pointers and graphics slots do not count');
+  const hp = st.slice(); hp[at(0x5551EC + 0xAFC)] ^= 1;
+  assert.notStrictEqual(MbaaRollback.valueHash(hp), h0, 'P2 health counts');
+  const rng = st.slice(); rng[at(0x564070 + 100)] ^= 1;
+  assert.notStrictEqual(MbaaRollback.valueHash(rng), h0, 'RNG counts');
+}
+
 console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch located at ${rb.stats.firstMismatch.first}, state ${rb.stats.stateBytes} bytes`);
