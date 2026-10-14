@@ -4742,7 +4742,7 @@ class WineAssembly {
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
       'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route',
       'mbaa-sfx-filter': 'sfx-filter', 'mbaa-frame-stage': 'rollback-test',
-      'mbaa-gfx-skip': 'native-gfx-skip' };
+      'mbaa-gfx-skip': 'native-gfx-skip', 'mbaa-move-skip': 'native-move-skip' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4782,6 +4782,7 @@ class WineAssembly {
       },
       'mbaa-gfx-skip': cfg => typeof NativeMbaaGfxSkip === 'function' && new NativeMbaaGfxSkip(cfg, {
         getBuffer: () => this.memory.buffer }),
+      'mbaa-move-skip': cfg => typeof NativeMbaaMoveSkip === 'function' && new NativeMbaaMoveSkip(cfg),
       'mbaa-frame-stage': cfg => {
         if (typeof MbaaStageTimer !== 'function' || !(q && q.has('rollback-test'))) return null;
         this._mbaaStages = this._mbaaStages || new MbaaStageTimer();

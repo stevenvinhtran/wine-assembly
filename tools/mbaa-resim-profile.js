@@ -163,8 +163,9 @@ const hex = v => typeof v === 'number' ? '0x' + v.toString(16) : v;
 console.log(`session ${d.session}: ${frames} profiled re-run frames, ${p.distinct} distinct blocks`);
 console.log(`~${Math.round(total / frames).toLocaleString()} instructions per re-run frame` +
   ` (outside MBAA.exe ${pct(outside)}, not reached from 0x40e390 ${pct(unowned)})`);
-const timing = d.rollback.resimGuestMsPerFrame || [];
-if (timing.length) console.log(`timed re-runs: guest ${timing.slice(-5).join(', ')} ms/frame`);
+const timing = d.rollback.resimGuestMsPerFrame || [], game = d.rollback.resimGameMsPerFrame || [];
+if (timing.length) console.log(`timed re-runs: guest ${timing.slice(-5).join(', ')} ms/frame (includes the self-test's per-frame checks)`);
+if (game.length) console.log(`game code only: ${game.slice(-8).join(', ')} ms/frame; state capture ${d.rollback.captureMs} ms`);
 console.log('\nFrame stages (inclusive):');
 for (const [s, w] of [...byStage].sort((a, b) => b[1] - a[1])) console.log(`  ${hex(s).padEnd(10)} ${pct(w)}`);
 console.log(`\nHottest functions (exclusive, top ${top}):`);
