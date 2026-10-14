@@ -682,6 +682,10 @@
     html.embed #toolbar, html.embed #log, html.embed #page-fullscreen-exit,
     html.embed #browser-fullscreen-consent, html.embed #page-fullscreen-hint { display: none !important; }
     html.embed, html.embed body { background: #000 !important; }
+    /* Embedded, the pointer stays visible while it moves and hides after a
+       pause (lib/embed-host.js), whatever cursor the guest asks for. */
+    html.embed canvas { cursor: default !important; }
+    html.embed.cursor-idle, html.embed.cursor-idle * { cursor: none !important; }
     .wa-launch [hidden] { display: none !important; }
     .wa-launch-titlebar {
       display: flex; align-items: center; gap: 4px; margin: 2px; padding: 2px 3px; height: 18px;
@@ -2152,6 +2156,7 @@ Resource-aware Win98 emulator
       "lib/native-inflate.js",
       "lib/native-d3dx-matrix.js",
       "lib/native-mbaa-limiter.js",
+      "lib/native-mbaa-gfx-loop.js",
       "lib/mbaa-rollback.js",
       "host.js",
       "lib/recorder.js",

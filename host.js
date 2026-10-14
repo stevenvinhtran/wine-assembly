@@ -4741,7 +4741,8 @@ class WineAssembly {
       'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate',
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
       'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route',
-      'mbaa-sfx-filter': 'sfx-filter', 'mbaa-frame-stage': 'rollback-test' };
+      'mbaa-sfx-filter': 'sfx-filter', 'mbaa-frame-stage': 'rollback-test',
+      'mbaa-gfx-skip': 'native-gfx-skip' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4779,6 +4780,8 @@ class WineAssembly {
         this._mbaaSfxState = this._mbaaSfxState || { frame: -1, resim: false, from: -1, to: -1 };
         return new MbaaSfxFilter(cfg, { getBuffer: () => this.memory.buffer, state: this._mbaaSfxState });
       },
+      'mbaa-gfx-skip': cfg => typeof NativeMbaaGfxSkip === 'function' && new NativeMbaaGfxSkip(cfg, {
+        getBuffer: () => this.memory.buffer }),
       'mbaa-frame-stage': cfg => {
         if (typeof MbaaStageTimer !== 'function' || !(q && q.has('rollback-test'))) return null;
         this._mbaaStages = this._mbaaStages || new MbaaStageTimer();
@@ -4793,6 +4796,7 @@ class WineAssembly {
         if (!selfTest && !bridge && !netplay) return null;
         return new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg),
           selfTest, window: Number(q && q.get('rollback-window')) || 8, route: this._mbaaRoute || null,
+          lockCharaSelect: !!(embed && (embed.mode || embed.netplay)),
           guestMs: () => this._guestMainMs || 0, hostSteps: () => this._stepTicks | 0,
           stages: () => this._mbaaStages || null,   // its checkpoints are armed after this hook
           // Netplay (melty-web's RollbackCore, set by the launcher on this window).

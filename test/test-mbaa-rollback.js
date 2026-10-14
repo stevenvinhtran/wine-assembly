@@ -113,6 +113,21 @@ assert(rb.stats.skipped > skipped, 'they skip it');
   delete ex.invalidate_code_range;
 }
 
+// A launcher-started mode cannot leave character select: cancel is dropped
+// for a side still choosing its character, and kept once it has moved on.
+{
+  const u16 = a => dv.getUint16(g2w(a), true);
+  const lock = new MbaaRollback({ eip: 0x40e390 }, { getBuffer: () => buffer, publish: false, lockCharaSelect: true,
+    inputSource: () => ({ p1: { dir: 4, btn: 0x20 | 0x800 | 0x10 }, p2: { dir: 5, btn: 0x20 | 0x800 } }) });
+  w32(0x54EEE8, 20); w32(0x74D8EC, 0); w32(0x74D910, 1);
+  lock.hook(0x40e390, ex);
+  assert.strictEqual(u16(INPUTS + 0x24), 0x10, 'P1 choosing a character: cancel dropped, A kept');
+  assert.strictEqual(u16(INPUTS + 0x38), 0x820, 'P2 on moon select: cancel goes back a step');
+  w32(0x54EEE8, 1);
+  lock.hook(0x40e390, ex);
+  assert.strictEqual(u16(INPUTS + 0x24), 0x830, 'outside character select nothing is dropped');
+}
+
 // Mode route: the first menu confirmation runs the prologue and lands on the
 // chosen branch; later ones run the game's own code.
 {
