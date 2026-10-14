@@ -4739,7 +4739,8 @@ class WineAssembly {
       'd3dx-dxt5-encode': 'native-dxt5', 'd3dx-dxt-color-decode': 'native-dxt-decode',
       'd3dx-dxt3-decode': 'native-dxt-decode', 'd3dx-dxt5-decode': 'native-dxt-decode',
       'd3dx-argb-decode': 'native-dxt-decode', 'zlib-inflate': 'native-inflate',
-      'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter' };
+      'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
+      'mbaa-rollback-frame': 'rollback-test' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4757,6 +4758,10 @@ class WineAssembly {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
       'mbaa-limiter-sleep': cfg => typeof NativeMbaaLimiter === 'function' && new NativeMbaaLimiter(cfg),
       'mbaa-spin-limiter': cfg => typeof NativeMbaaSpinLimiter === 'function' && new NativeMbaaSpinLimiter(cfg),
+      // Rollback groundwork (lib/mbaa-rollback.js): armed only for ?rollback-test.
+      'mbaa-rollback-frame': cfg => typeof MbaaRollback === 'function' && q && q.has('rollback-test') &&
+        new MbaaRollback(cfg, { getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg), selfTest: true,
+          window: Number(q.get('rollback-window')) || 8 }),
       'd3dx-matrix-multiply': cfg => typeof NativeD3dxMatrix === 'function' && new NativeD3dxMatrix(cfg, {
         getBuffer: () => this.memory.buffer }),
       'zlib-inflate': cfg => typeof NativeInflate === 'function' && new NativeInflate(cfg, {
