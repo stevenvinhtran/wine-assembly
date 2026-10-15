@@ -284,5 +284,11 @@ console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch lo
   regs.ecx = 0x535CE8;   // RETURN_TITLE
   assert.strictEqual(mb.hook(0x42bdc0, mex), true);
   assert.deepStrictEqual([regs.eax, regs.eip, regs.esp], [0, 0x44dae2, 0x7e1004], 'answered "no match" and returned');
+  // Training's EXIT: blocked only at its pause menu's confirm.
+  regs.esp = 0x7e1000; regs.eip = 0; w32(0x7e1000, 0x478509); regs.ecx = 0x5365A8;
+  assert.strictEqual(mb.hook(0x42bdc0, mex), true, 'EXIT at Training\'s confirm');
+  assert.deepStrictEqual([regs.eip, regs.esp], [0x4784d3, 0x7e1004], 'Training EXIT acts as CONTINUE');
+  regs.esp = 0x7e1000; w32(0x7e1000, 0x431555); regs.ecx = 0x5365A8;
+  assert.strictEqual(mb.hook(0x42bdc0, mex), false, 'EXIT elsewhere: the game decides');
   console.log('menu block PASS');
 }
