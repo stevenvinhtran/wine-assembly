@@ -605,6 +605,24 @@ class WineAssembly {
     return out;
   }
   static CLOCK_SPIN_PARK_MS = 1;
+  // MBAA's rollback controller sometimes declines a game frame. Preserve one
+  // wall-clock deadline across scheduler turns: runnable guest worker threads
+  // can force the host loop to keep turning, but must not make the main game
+  // thread retry early. Returns zero once the deadline has expired.
+  _mbaaFrameParkDelay(requestedMs) {
+    const now = WineAssembly._wallNow();
+    if (!this._mbaaFrameParkUntil) {
+      const requested = Math.max(1, Math.min(WineAssembly.MAX_PARK_SLEEP_MS,
+        requestedMs | 0 || 1));
+      this._mbaaFrameParkUntil = now + requested;
+    }
+    const left = this._mbaaFrameParkUntil - now;
+    if (left <= 0) {
+      this._mbaaFrameParkUntil = 0;
+      return 0;
+    }
+    return Math.min(WineAssembly.MAX_PARK_SLEEP_MS, left);
+  }
   // Browser performance.now() is much more expensive than the integer-ms
   // result the guest receives. Reuse each within-slice sample for four calls;
   // every run-slice boundary still refreshes unconditionally, so a sparse
@@ -5976,7 +5994,7 @@ class WineAssembly {
         // (caught above as eip=0), 3 com_load_dll, 5 load_library, 6
         // modal_dialog, 7 message_wait, 8 net_wait, 9 critical-section wait,
         // 10 cross-thread send, 12 io_wait, 13 vblank_wait, 14/15 spin parks
-        // and 16 D3D render wait. Reason 4
+        // 16 D3D render wait and 18 MBAA frame-controller park. Reason 4
         // (help_load) is named in thread-manager.js's map but is never set by
         // any WAT or JS path, so there is nothing to port for it. The fallback
         // below stays as a guard for anything added later.
@@ -6105,6 +6123,19 @@ class WineAssembly {
             if (self.running) self._scheduleStep(step, 0);
           }, advanceVblank);
           return;
+        } else if (r.yield === 18) {
+          // MBAA's frame controller returned without simulating this frame.
+          // Keep the yield armed until its requested wall deadline. Clearing
+          // it immediately reduced a pacing skip to a ~1 ms retry; the faster
+          // peer then ran in bursts and accumulated avoidable rollbacks.
+          const left = self._mbaaFrameParkDelay(r.yieldFlag);
+          if (left <= 0) {
+            await self.guestWorker.callExport('clear_yield');
+          } else {
+            // Runnable sibling threads may keep host steps flowing. Leaving
+            // yield 18 set prevents those steps from retrying the game frame.
+            self._workerParkMain(left, perfSliceDoneAt);
+          }
         } else if (r.yield === 14 || r.yield === 15) {
           // A spin park in the worker that carries the guest's MAIN thread.
           // Clearing re-enters the parked call on its next slice. This branch
@@ -7303,6 +7334,17 @@ class WineAssembly {
             if (self.running) self._scheduleStep(step, 0);
           });
           return;
+        }
+        if (yieldReason === 18) {
+          let requested = 1;
+          try { requested = self.instance.exports.get_yield_flag() | 0; } catch (_) {}
+          const left = self._mbaaFrameParkDelay(requested);
+          if (left <= 0) {
+            self.instance.exports.clear_yield();
+          } else {
+            self._spinParkSleepMs = left;
+            mainParked = true;
+          }
         }
         if (yieldReason === 14 || yieldReason === 15) {
           // A spin park: the guest was busy-waiting on the millisecond clock

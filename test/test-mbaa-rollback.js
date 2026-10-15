@@ -179,8 +179,10 @@ assert(rb.stats.skipped > skipped, 'they skip it');
 {
   const { MbaaSfxFilter } = require('../lib/mbaa-rollback');
   const regs = { esp: 0x7e1000, eip: 0, eax: 0 };
+  let yielded = null;
   const cex = Object.assign({}, ex, { get_esp: () => regs.esp, set_esp: v => { regs.esp = v; },
-    set_eip: v => { regs.eip = v; }, set_eax: v => { regs.eax = v; } });
+    set_eip: v => { regs.eip = v; }, set_eax: v => { regs.eax = v; },
+    set_yield_state: (reason, flag) => { yielded = [reason, flag]; } });
   w32(0x7e1000, 0x40d355);                     // return address into the message loop
   w32(0x774A80, 3579545); w32(0x55D25C, 0);
   const calls = [];
@@ -190,7 +192,7 @@ assert(rb.stats.skipped > skipped, 'they skip it');
       this.n++;
       calls.push(this.n);
       if (this.n === 1) { api.setInputs({ p1: { dir: 4, btn: 0x10 }, p2: { dir: 6, btn: 0 } }); api.setTurbo(true); }
-      if (this.n === 2) api.skip();
+      if (this.n === 2) api.skip(16);
       if (this.n === 3) { api.setTurbo(false); api.setInputs({ p1: {}, p2: {} }); }
     },
   };
@@ -204,6 +206,7 @@ assert(rb.stats.skipped > skipped, 'they skip it');
   w32(0x55D25C, 0);                            // the game counts it down
   assert.strictEqual(net.hook(0x40e390, cex), true, 'a stalled frame is answered');
   assert.deepStrictEqual([regs.eax, regs.eip, regs.esp], [1, 0x40d355, 0x7e1004], 'returns 1 to the loop');
+  assert.deepStrictEqual(yielded, [18, 16], 'controller park duration is carried by its own yield');
   regs.esp = 0x7e1000;
   net.hook(0x40e390, cex);
   assert.strictEqual(r32(0x774A80), 3579545, 'turbo off restores the frequency');

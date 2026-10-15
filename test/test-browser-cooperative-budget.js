@@ -71,4 +71,18 @@ for (const options of [{ halt: 3 }, { halt: 5 }, { yieldReason: 1 },
     'account retired blocks, never the requested budget');
   assert.strictEqual(calls.length, 1);
 }
+
+// A controller park is a deadline, not a per-scheduler-turn delay. Worker
+// threads may keep turns flowing while the game frame remains parked.
+{
+  let now = 100;
+  context.WineAssembly._wallNow = () => now;
+  const wine = Object.create(context.WineAssembly.prototype);
+  assert.strictEqual(wine._mbaaFrameParkDelay(16), 16);
+  now = 110;
+  assert.strictEqual(wine._mbaaFrameParkDelay(16), 6, 'a retry keeps the original deadline');
+  now = 116;
+  assert.strictEqual(wine._mbaaFrameParkDelay(16), 0, 'the deadline expires once');
+  assert.strictEqual(wine._mbaaFrameParkDelay(80), 50, 'new parks are bounded by the scheduler cap');
+}
 console.log('PASS cooperative wall budget, actual work, yields, and frozen stepping');
