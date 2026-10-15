@@ -17,9 +17,11 @@
 //           the splice it replaces, because a guest rewrite would be silent)
 //
 // These rules carry more weight than they did when this path was opt-in: the
-// worklet is now the DEFAULT, so Rule 1 is the only thing standing between
-// Minesweeper and a process() callback it will never stop paying for. It is
-// asserted below against a ctx with no flag set at all -- the shipping config.
+// worklet is now the default on compatible browsers, so Rule 1 is the only
+// thing standing between Minesweeper and a process() callback it will never
+// stop paying for. Firefox defaults to the source-node fallback because its
+// device output can repeat worklet fragments even while graph meters and the
+// shared cursor advance normally.
 
 'use strict';
 
@@ -275,8 +277,15 @@ async function settleModule(ctx) {
     const v = { rate: RATE, channels: 1, bits: 8, gain: null };
 
     ok(router.enabled({}) === true, 'the router is ON for a ctx that says nothing');
-    ok(router.enabled({ audioWorklet: false }) === false, 'and off only when opted out');
+    ok(router.enabled({ audioWorklet: false }) === false, 'and off with an explicit opt-out');
     ok(router.enabled({ audioWorklet: true }) === true, 'and on when opted in explicitly');
+
+    const firefoxRouter = createWorkletRouter({ userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:158.0) Gecko/20100101 Firefox/158.0' });
+    ok(firefoxRouter.enabled({}) === false,
+      'Firefox defaults to the source-node path to avoid repeated output fragments');
+    ok(firefoxRouter.enabled({ audioWorklet: true }) === true,
+      'Firefox can still opt into the worklet for diagnostics');
 
     const on = { audioWorklet: true };
     ok(router.canRoute(on, ac, v, 0, mem) === false, 'canRoute refuses loop=0');
