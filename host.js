@@ -4515,6 +4515,19 @@ class WineAssembly {
       this.threadManager.setLoadedDlls(results, entryCaller);
     }
     this._armNativeHooks();
+    // Netplay tests (?heap-shift on one side): start the game's heap later,
+    // so its heap addresses differ from the other side's as they would on
+    // another computer.
+    try {
+      const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
+      const shift = embed && embed.netplay ? embed.netplay.heapShift | 0 : 0;
+      const ex = this.instance && this.instance.exports;
+      if (shift > 0 && ex && ex.guest_alloc) {
+        ex.guest_alloc(shift);
+        // The game's big allocations come from the sparse range (VirtualAlloc).
+        if (ex.guest_map_alloc) ex.guest_map_alloc(Math.max(0x10000, shift & ~0xFFF));
+      }
+    } catch (_) {}
     this._inDllInit = false;
     this.running = true;
   }
