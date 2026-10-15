@@ -128,6 +128,33 @@ assert(rb.stats.skipped > skipped, 'they skip it');
   assert.strictEqual(u16(INPUTS + 0x24), 0x830, 'outside character select nothing is dropped');
 }
 
+// Training's pause menu keeps RETURN TO MAIN MENU visible, but suppresses A
+// and confirm while that item is selected. A recent vertical move suppresses
+// confirm too, matching CCCaster's three-frame stale-index guard.
+{
+  const u16 = a => dv.getUint16(g2w(a), true);
+  const menuState = { index: 16 };
+  let input = { p1: { dir: 5, btn: 0x10 | 0x400 }, p2: { dir: 5, btn: 0 } };
+  const training = new MbaaRollback({ eip: 0x40e390 }, { getBuffer: () => buffer, publish: false,
+    training: true, menuState, inputSource: () => input });
+  w32(0x54EEE8, 1); dv.setUint8(g2w(0x55D203), 1);
+  training.hook(0x40e390, ex);
+  assert.strictEqual(u16(INPUTS + 0x24), 0, 'RETURN TO MAIN MENU cannot be confirmed');
+  menuState.index = 15;
+  training.hook(0x40e390, ex);
+  assert.strictEqual(u16(INPUTS + 0x24), 0x410, 'another item remains selectable');
+  input = { p1: { dir: 8, btn: 0x410 }, p2: { dir: 5, btn: 0 } };
+  training.hook(0x40e390, ex);
+  assert.strictEqual(u16(INPUTS + 0x24), 0, 'confirm is suppressed on a vertical move');
+  input.p1.dir = 5;
+  training.hook(0x40e390, ex); training.hook(0x40e390, ex);
+  assert.strictEqual(u16(INPUTS + 0x24), 0, 'confirm stays suppressed while the captured index catches up');
+  training.hook(0x40e390, ex);
+  assert.strictEqual(u16(INPUTS + 0x24), 0x410, 'confirm resumes after the guard');
+  dv.setUint8(g2w(0x55D203), 0);
+  console.log('training pause menu input guard PASS');
+}
+
 // Mode route: the first menu confirmation runs the prologue and lands on the
 // chosen branch; later ones run the game's own code.
 {
@@ -283,6 +310,27 @@ console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch lo
   console.log('training reset PASS');
 }
 
+// Menu cursor capture emulates the overwritten instruction, and the exact
+// CCCaster Training-music branch keeps the current BGM alive across FN2.
+{
+  const { MbaaMenuIndex, MbaaTrainingMusic } = require('../lib/mbaa-rollback.js');
+  const regs = { esi: 0x7e3000, ecx: 0, edi: 0, eip: 0 };
+  const nex = Object.assign({}, ex, { get_esi: () => regs.esi, set_ecx: v => { regs.ecx = v; },
+    set_edi: v => { regs.edi = v; }, set_eip: v => { regs.eip = v; } });
+  w32(0x7e3040, 16); w32(0x7e304c, 0x7e4000);
+  const mi = new MbaaMenuIndex({ eip: 0x4299c8, nonnull: 0x4299d2, null: 0x4299de });
+  assert.strictEqual(mi.hook(0x4299c7, nex), false, 'another instruction is ignored');
+  assert.strictEqual(mi.hook(0x4299c8, nex), true);
+  assert.deepStrictEqual([mi.index, regs.ecx, regs.edi, regs.eip], [16, 0x7e4000, 16, 0x4299d2]);
+  w32(0x7e304c, 0); mi.hook(0x4299c8, nex);
+  assert.strictEqual(regs.eip, 0x4299de, 'null item vector takes the original branch');
+  const music = new MbaaTrainingMusic({ eip: 0x472c6f, target: 0x472c74 });
+  regs.eip = 0;
+  assert.strictEqual(music.hook(0x472c6f, nex), true);
+  assert.deepStrictEqual([regs.eip, music.stats.skipped], [0x472c74, 1]);
+  console.log('menu index and training music hooks PASS');
+}
+
 // Menu block: RETURN_TITLE / EXIT_VS_GAME never match; other items run the game's test.
 {
   const { MbaaMenuBlock } = require('../lib/mbaa-rollback.js');
@@ -297,16 +345,9 @@ console.log(`mbaa rollback PASS: ${rb.stats.passes} re-runs matched, mismatch lo
   regs.ecx = 0x535CE8;   // RETURN_TITLE
   assert.strictEqual(mb.hook(0x42bdc0, mex), true);
   assert.deepStrictEqual([regs.eax, regs.eip, regs.esp], [0, 0x44dae2, 0x7e1004], 'answered "no match" and returned');
-  // Training's EXIT: blocked only at its pause menu's confirm, and only when
-  // the chosen item (std::string in edi, inline text) is EXIT.
-  const item = name => { w32(0x7e2014, name.length); w32(0x7e2018, 15); for (let i = 0; i < 16; i++) dv.setUint8(g2w(0x7e2004 + i), i < name.length ? name.charCodeAt(i) : 0); };
-  item('CHARACTER_SELECT'.slice(0, 15));
+  // Training's EXIT is now handled before menu dispatch by the cursor/input
+  // guard above; this string comparator is left untouched.
   regs.esp = 0x7e1000; regs.eip = 0; w32(0x7e1000, 0x478509); regs.ecx = 0x5365A8;
-  assert.strictEqual(mb.hook(0x42bdc0, mex), false, 'another item passing the EXIT compare: the game decides');
-  item('EXIT');
-  assert.strictEqual(mb.hook(0x42bdc0, mex), true, 'EXIT at Training\'s confirm');
-  assert.deepStrictEqual([regs.eip, regs.esp], [0x4784d3, 0x7e1004], 'Training EXIT acts as CONTINUE');
-  regs.esp = 0x7e1000; w32(0x7e1000, 0x431555); regs.ecx = 0x5365A8;
-  assert.strictEqual(mb.hook(0x42bdc0, mex), false, 'EXIT elsewhere: the game decides');
+  assert.strictEqual(mb.hook(0x42bdc0, mex), false, 'Training EXIT: the game decides if input reaches it');
   console.log('menu block PASS');
 }

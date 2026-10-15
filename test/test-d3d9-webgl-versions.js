@@ -94,7 +94,20 @@ const assert=require('assert'),path=require('path'),puppeteer=require('puppeteer
         }catch(error){mipError=error.message;}
         npot.push({version,samples,errors,mipPixel,mipError,error:gl.getError()});d.destroy();
       }
-      return {outputs,fallbackVersion,forcedRejected,legacyVersion,npot};
+      // Firefox is allowed to promote DEPTH_COMPONENT16 to a 32-bit depth
+      // renderbuffer. Simulate that legal implementation choice here so an
+      // exact-size check cannot regress into a black MBAA window again.
+      const promotedCanvas=document.createElement('canvas');promotedCanvas.width=promotedCanvas.height=4;
+      const promotedDevice=new D3D9Backend.Device(promotedCanvas,{webglVersion:2});
+      const promotedGl=promotedDevice.gpu.gl;
+      const promotedGet=promotedGl.getRenderbufferParameter.bind(promotedGl);
+      promotedGl.getRenderbufferParameter=(target,pname)=>pname===promotedGl.RENDERBUFFER_DEPTH_SIZE
+        ? Math.max(32,promotedGet(target,pname)):promotedGet(target,pname);
+      let promotedDepth=false,promotedError='';
+      try{promotedDevice.gpu.bindRenderTarget('promoted-depth',4,4,16);promotedDepth=true;}
+      catch(error){promotedError=error.message;}
+      promotedDevice.destroy();
+      return {outputs,fallbackVersion,forcedRejected,legacyVersion,npot,promotedDepth,promotedError};
     });
     for(const [i,entry]of result.outputs.entries()){
       assert.strictEqual(entry.version,i+1);assert(entry.dialect);assert.strictEqual(entry.error,0);
@@ -103,6 +116,7 @@ const assert=require('assert'),path=require('path'),puppeteer=require('puppeteer
       else assert.deepStrictEqual(entry.feedbackValues,[-1,-1,3,-1,-1,3],'transform feedback captures real vertex shader outputs');
     }
     assert.strictEqual(result.fallbackVersion,1);assert(result.forcedRejected);assert.strictEqual(result.legacyVersion,1);
+    assert(result.promotedDepth,result.promotedError||'a promoted depth format is accepted');
     for(const entry of result.npot){
       assert.strictEqual(entry.error,0);
       if(entry.version===1){

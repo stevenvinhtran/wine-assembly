@@ -4770,7 +4770,8 @@ class WineAssembly {
       'd3dx-matrix-multiply': 'native-matrix', 'mbaa-limiter-sleep': 'native-limiter', 'mbaa-spin-limiter': 'native-limiter',
       'mbaa-rollback-frame': 'rollback-test', 'mbaa-mode-route': 'mode-route',
       'mbaa-sfx-filter': 'sfx-filter', 'mbaa-frame-stage': 'rollback-test',
-      'mbaa-gfx-skip': 'native-gfx-skip', 'mbaa-move-skip': 'native-move-skip', 'mbaa-menu-block': 'menu-block', 'mbaa-lookup-skip': 'native-lookup-skip', 'mbaa-pcm16': 'native-pcm16' };
+      'mbaa-gfx-skip': 'native-gfx-skip', 'mbaa-move-skip': 'native-move-skip', 'mbaa-menu-index': 'menu-block',
+      'mbaa-training-music': 'training-music', 'mbaa-menu-block': 'menu-block', 'mbaa-lookup-skip': 'native-lookup-skip', 'mbaa-pcm16': 'native-pcm16' };
     const make = {
       'vorbis-fill': cfg => typeof NativeVorbisFill === 'function' && new NativeVorbisFill(cfg, {
         getBuffer: () => this.memory.buffer, log: msg => this.logToUI(msg) }),
@@ -4814,6 +4815,17 @@ class WineAssembly {
       'mbaa-pcm16': cfg => typeof NativeMbaaPcm16 === 'function' && new NativeMbaaPcm16(cfg, { getBuffer: () => this.memory.buffer }),
       'mbaa-lookup-skip': cfg => typeof NativeMbaaLookupSkip === 'function' && new NativeMbaaLookupSkip(cfg, {
         getBuffer: () => this.memory.buffer }),
+      'mbaa-menu-index': cfg => {
+        const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
+        if (typeof MbaaMenuIndex !== 'function' || !(embed && embed.mode === 'training' && !embed.netplay)) return null;
+        this._mbaaMenuState = new MbaaMenuIndex(cfg);
+        return this._mbaaMenuState;
+      },
+      'mbaa-training-music': cfg => {
+        const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
+        if (typeof MbaaTrainingMusic !== 'function' || !(embed && embed.mode === 'training' && !embed.netplay)) return null;
+        return new MbaaTrainingMusic(cfg);
+      },
       'mbaa-menu-block': cfg => {
         const embed = typeof window !== 'undefined' ? window.__waEmbedConfig : null;
         if (typeof MbaaMenuBlock !== 'function' || !(embed && (embed.mode || embed.netplay))) return null;
@@ -4835,6 +4847,7 @@ class WineAssembly {
           selfTest, window: Number(q && q.get('rollback-window')) || 8, route: this._mbaaRoute || null,
           lockCharaSelect: !!(embed && (embed.mode || embed.netplay)),
           training: !!(embed && embed.mode === 'training' && !embed.netplay),
+          menuState: this._mbaaMenuState || null,
           netplay,
           noPause: !!(embed && embed.mode && embed.mode !== 'training'),
           guestMs: () => this._guestMainMs || 0, hostSteps: () => this._stepTicks | 0,
